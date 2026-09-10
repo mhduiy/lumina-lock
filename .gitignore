@@ -1,0 +1,15 @@
+build*/
+obj-*/
+*.o
+*.so
+*.a
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.user
+*.qmlc
+*.jsc
+.DS_Store
+compile_commands.json
+.qmake.stash
