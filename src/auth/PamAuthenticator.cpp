@@ -38,6 +38,13 @@ void PamAuthenticator::authenticate(const QString &user, const QByteArray &passw
     if (m_busy.load())
         return;
 
+    // Reap any previous worker *before* (re)assigning m_thread. A std::thread
+    // whose function already returned is still joinable, and destroying it via
+    // reassignment would call std::terminate. By the time m_busy is false the
+    // previous worker has already posted its result and is about to finish, so
+    // joining here is immediate.
+    joinThread();
+
     qDebug() << "PAM: authenticate() requested for user" << user;
 
     auto job = std::make_shared<Job>();

@@ -85,7 +85,6 @@ Item {
                 onErrorOccurred: (error, errorString) => {
                     console.warn("WallpaperHost: video error:", errorString)
                 }
-                Component.onDestruction: player.stop()
             }
 
             VideoOutput {
