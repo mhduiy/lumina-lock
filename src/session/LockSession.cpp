@@ -3,6 +3,7 @@
 #include "auth/PamAuthenticator.h"
 
 #include <QCoreApplication>
+#include <QDebug>
 
 #include <pwd.h>
 #include <unistd.h>
@@ -58,7 +59,24 @@ void LockSession::authenticate(const QString &password)
 
 void LockSession::unlock()
 {
+    if (!m_locked)
+        return;
+    m_locked = false;
+    emit lockedChanged(false);
     emit unlocked();
+}
+
+void LockSession::lock()
+{
+    if (m_locked)
+        return;
+    m_locked = true;
+    emit lockedChanged(true);
+}
+
+void LockSession::quit()
+{
+    emit quitRequested();
 }
 
 void LockSession::clearError()
@@ -77,6 +95,8 @@ void LockSession::onAuthFinished(bool success, const QString &message)
     if (!success) {
         m_errorMessage = message.isEmpty() ? tr("Authentication failed") : message;
         emit errorMessageChanged();
+        // Failure audit (message only — never the password).
+        qWarning().noquote() << "Authentication failed:" << m_errorMessage;
     }
     emit authenticationFinished(success, message);
 }

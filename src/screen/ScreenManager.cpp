@@ -7,6 +7,8 @@
 #include <QScreen>
 #include <QDebug>
 
+#include <utility>
+
 ScreenManager::ScreenManager(QQmlEngine *engine, QObject *parent)
     : QObject(parent)
     , m_engine(engine)
@@ -25,11 +27,19 @@ void ScreenManager::start()
             this, &ScreenManager::onScreenRemoved);
 }
 
-void ScreenManager::shutdown()
+void ScreenManager::showAll()
 {
-    const auto screens = m_windows.keys();
-    for (QScreen *screen : screens)
-        destroyWindowForScreen(screen);
+    for (QQuickWindow *window : std::as_const(m_windows)) {
+        window->showFullScreen();
+        window->raise();
+        window->requestActivate();
+    }
+}
+
+void ScreenManager::hideAll()
+{
+    for (QQuickWindow *window : std::as_const(m_windows))
+        window->hide();
 }
 
 void ScreenManager::onScreenAdded(QScreen *screen)
@@ -74,6 +84,7 @@ void ScreenManager::createWindowForScreen(QScreen *screen)
     window->setScreen(screen);
     window->setGeometry(screen->geometry());
     window->showFullScreen();
+    window->raise();
     window->requestActivate();
 
     m_windows.insert(screen, window);

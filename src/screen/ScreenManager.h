@@ -30,7 +30,8 @@ public:
 
 public slots:
     void start();
-    void shutdown();
+    void showAll();
+    void hideAll();
 
 private slots:
     void onScreenAdded(QScreen *screen);

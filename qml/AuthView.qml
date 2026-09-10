@@ -102,6 +102,11 @@ Item {
         auth.errorText = ""
     }
 
+    function reset() {
+        auth.errorText = ""
+        field.text = ""
+    }
+
     function focusField() {
         field.focusField()
     }

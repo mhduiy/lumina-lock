@@ -4,6 +4,8 @@
 #include "wallpaper/WallpaperManager.h"
 
 #include <QCommandLineParser>
+#include <QDBusConnection>
+#include <QDBusError>
 #include <QGuiApplication>
 #include <QQmlEngine>
 #include <QTimer>
@@ -88,10 +90,28 @@ int main(int argc, char *argv[])
     screens.setPrimaryUrl(QUrl(QStringLiteral("qrc:/qml/LockScreen.qml")));
     screens.setSecondaryUrl(QUrl(QStringLiteral("qrc:/qml/SecondaryScreen.qml")));
 
-    QObject::connect(&session, &LockSession::unlocked, &app, [&screens, &app]() {
-        screens.shutdown();
-        app.quit();
+    // Resident service: unlocking hides the surfaces, locking shows them again.
+    QObject::connect(&session, &LockSession::lockedChanged, &app, [&screens](bool locked) {
+        if (locked)
+            screens.showAll();
+        else
+            screens.hideAll();
     });
+
+    QObject::connect(&session, &LockSession::quitRequested, &app, &QCoreApplication::quit);
+
+    // D-Bus interface so a session manager can (re)engage the lock. This is
+    // the seam for replacing dde-lock: `org.lumina.Lock.lock` re-locks,
+    // `org.lumina.Lock.quit` shuts the resident process down.
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    if (!bus.registerService(QStringLiteral("org.lumina.Lock"))) {
+        qWarning() << "Failed to register D-Bus service org.lumina.Lock:"
+                   << bus.lastError().message();
+    }
+    bus.registerObject(QStringLiteral("/org/lumina/Lock"), &session,
+                       QDBusConnection::ExportAllSlots
+                           | QDBusConnection::ExportAllSignals
+                           | QDBusConnection::ExportAllProperties);
 
     if (parser.isSet(testExitOpt)) {
         bool ok = false;

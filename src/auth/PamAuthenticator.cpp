@@ -38,6 +38,8 @@ void PamAuthenticator::authenticate(const QString &user, const QByteArray &passw
     if (m_busy.load())
         return;
 
+    qDebug() << "PAM: authenticate() requested for user" << user;
+
     auto job = std::make_shared<Job>();
     job->user = user.toStdString();
     job->password.assign(password.constData(), static_cast<std::size_t>(password.size()));
@@ -112,6 +114,7 @@ int PamAuthenticator::runPam(Job &job, const std::string &service)
     pam_conv conv{&PamAuthenticator::conversation, &job};
 
     int rc = pam_start(service.c_str(), job.user.c_str(), &conv, &handle);
+    qDebug() << "PAM: pam_start rc" << rc;
     if (rc != PAM_SUCCESS) {
         const char *raw = handle ? pam_strerror(handle, rc) : nullptr;
         job.message = friendlyError(rc, raw ? std::string(raw) : std::string()).toStdString();
@@ -121,6 +124,7 @@ int PamAuthenticator::runPam(Job &job, const std::string &service)
     }
 
     rc = pam_authenticate(handle, 0);
+    qDebug() << "PAM: pam_authenticate rc" << rc;
 
     if (rc != PAM_SUCCESS)
         job.message = friendlyError(rc, job.message).toStdString();

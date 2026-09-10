@@ -15,10 +15,12 @@ class PamAuthenticator;
 class LockSession : public QObject
 {
     Q_OBJECT
+    Q_CLASSINFO("D-Bus Interface", "org.lumina.Lock")
     Q_PROPERTY(QString userName READ userName CONSTANT)
     Q_PROPERTY(QString displayName READ displayName CONSTANT)
     Q_PROPERTY(QString hostName READ hostName CONSTANT)
     Q_PROPERTY(bool authenticating READ authenticating NOTIFY authenticatingChanged)
+    Q_PROPERTY(bool locked READ locked NOTIFY lockedChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
 
 public:
@@ -28,6 +30,7 @@ public:
     QString displayName() const { return m_displayName; }
     QString hostName() const { return m_hostName; }
     bool authenticating() const { return m_authenticating; }
+    bool locked() const { return m_locked; }
     QString errorMessage() const { return m_errorMessage; }
 
     /** Override the target user (CLI --user). */
@@ -36,16 +39,29 @@ public:
     /** Ask PAM to verify the password for the current user. */
     Q_INVOKABLE void authenticate(const QString &password);
 
-    /** Signal the system that the session has been unlocked. */
+    /**
+     * Mark the session as unlocked. Called by QML *after* the exit animation.
+     * Hides the surfaces but keeps the process resident (the lock is a
+     * long-running service, not a one-shot window).
+     */
     Q_INVOKABLE void unlock();
 
     Q_INVOKABLE void clearError();
 
+public slots:
+    /** Re-engage the lock (exposed on D-Bus for session integration). */
+    void lock();
+
+    /** Gracefully shut the resident process down (D-Bus). */
+    void quit();
+
 signals:
     void authenticatingChanged();
     void errorMessageChanged();
+    void lockedChanged(bool locked);
     void authenticationFinished(bool success, const QString &message);
     void unlocked();
+    void quitRequested();
 
 private:
     void onAuthFinished(bool success, const QString &message);
@@ -55,5 +71,6 @@ private:
     QString m_displayName;
     QString m_hostName;
     bool m_authenticating = false;
+    bool m_locked = true;
     QString m_errorMessage;
 };

@@ -75,31 +75,38 @@ Item {
         width: 14 * root.unit
         height: 14 * root.unit
         visible: root.busy
-        rotation: 0
 
         Rectangle {
-            anchors.centerIn: parent
-            width: 14 * root.unit
-            height: 14 * root.unit
+            id: ring
+            anchors.fill: parent
             radius: width / 2
             color: "transparent"
             border.width: 2 * root.unit
             border.color: Qt.rgba(1, 1, 1, 0.20)
         }
-        Rectangle {
-            x: parent.width / 2 - 1.5 * root.unit
-            y: -1.5 * root.unit
-            width: 3 * root.unit
-            height: 3 * root.unit
-            radius: width / 2
-            color: Theme.accent
-        }
-        RotationAnimator on rotation {
-            from: 0
-            to: 360
-            duration: 900
-            loops: Animation.Infinite
-            running: root.busy
+
+        // Only this layer rotates; the dot is placed at the 12 o'clock
+        // position on the ring's stroke (ring radius − stroke/2), so it
+        // travels exactly along the visible circle instead of outside it.
+        Item {
+            id: orbit
+            anchors.fill: parent
+            rotation: 0
+            Rectangle {
+                x: orbit.width / 2 - width / 2
+                y: orbit.height / 2 - (orbit.width / 2 - 1 * root.unit) - height / 2
+                width: 3 * root.unit
+                height: 3 * root.unit
+                radius: width / 2
+                color: Theme.accent
+            }
+            RotationAnimator on rotation {
+                from: 0
+                to: 360
+                duration: 900
+                loops: Animation.Infinite
+                running: root.busy
+            }
         }
     }
 

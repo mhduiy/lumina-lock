@@ -54,10 +54,12 @@ Item {
     }
 
     // --- Video (only instantiated when actually allowed to decode) ---
+    // Also tied to the lock state: while unlocked the surfaces are hidden, so
+    // the decoder is destroyed to release resources and recreated on re-lock.
     Loader {
         id: videoLoader
         anchors.fill: parent
-        active: root.isVideo && root.playVideo
+        active: root.isVideo && root.playVideo && LockSession.locked
         sourceComponent: videoComponent
     }
 

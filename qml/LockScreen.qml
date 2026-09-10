@@ -70,6 +70,10 @@ Window {
         property real clockOffset: 0
         property real authReveal: 0
 
+        // Toggled off while a re-lock resets the scene, so the layout snaps
+        // back to Idle instantly instead of animating from the previous state.
+        property bool animating: true
+
         state: "Idle"
 
         ClockView {
@@ -126,15 +130,19 @@ Window {
         ]
 
         Behavior on dimOpacity {
+            enabled: content.animating
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
         }
         Behavior on blurAmount {
+            enabled: content.animating
             NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
         }
         Behavior on clockOffset {
+            enabled: content.animating
             NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
         }
         Behavior on authReveal {
+            enabled: content.animating
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
         }
     }
@@ -193,6 +201,23 @@ Window {
         unlockAnim.start()
     }
 
+    // Re-lock: snap the scene back to Idle and restore full opacity before
+    // (or as) the surfaces are shown again.
+    function resetForLock() {
+        content.animating = false
+        root.unlocking = false
+        content.state = "Idle"
+        content.dimOpacity = 0
+        content.blurAmount = 0
+        content.clockOffset = 0
+        content.authReveal = 0
+        root.opacity = 1
+        content.scale = 1
+        auth.reset()
+        keyCatcher.forceActiveFocus()
+        content.animating = true
+    }
+
     // Natural exit: fade the whole surface and scale the content slightly,
     // then notify the session.
     SequentialAnimation {
@@ -212,6 +237,10 @@ Window {
 
     Connections {
         target: LockSession
+        function onLockedChanged(locked) {
+            if (locked)
+                root.resetForLock()
+        }
         function onAuthenticationFinished(success, message) {
             if (success) {
                 root.beginUnlock()

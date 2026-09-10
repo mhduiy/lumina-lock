@@ -11,7 +11,8 @@
 - 静态图片壁纸（`Image`，aspect-crop 填充）与视频动态壁纸（`MediaPlayer` + `VideoOutput`，循环、静音）
 - 视频带 poster 占位，进入时无黑屏闪烁；锁屏退出后释放视频资源
 - PAM 密码认证（C++ 层、异步、密码不落日志、生命周期尽量短）
-- 认证失败内联错误提示 + 密码框轻微 shake；成功则播放退出动画后通知解锁
+- 认证失败内联错误提示 + 密码框轻微 shake；成功则播放退出动画后解锁
+- **常驻进程**：解锁只隐藏窗口、释放视频资源，进程不退出；可通过 D-Bus 重新上锁（为替换 dde-lock 预留接口）
 - 基础多屏：主屏显示认证 UI，副屏只显示壁纸 + 时钟，且副屏不重复启动视频解码
 - HiDPI 友好：所有尺寸基于窗口高度等比缩放，无 1920×1080 写死
 
@@ -89,11 +90,29 @@ QML AuthView.submit(password)
        pam_start → pam_authenticate → pam_end
    → finished(success, message)                       [queued 回 GUI 线程]
    → LockSession.authenticationFinished
-   → QML：成功 → 退出动画 → LockSession.unlock() → app.quit()
+   → QML：成功 → 退出动画 → LockSession.unlock() → 隐藏窗口（进程常驻）
           失败 → 内联错误 + shake
 ```
 
-密码只在 `PamAuthenticator::Job`（worker 线程持有）中出现，`pam_authenticate` 返回后立即用 `volatile` 写零擦除；`LockSession` 的临时副本同样清零。密码不会被打印到日志。
+密码只在 `PamAuthenticator::Job`（worker 线程持有）中出现，`pam_authenticate` 返回后立即用 `volatile` 写零擦除；`LockSession` 的临时副本同样清零。密码不会被打印到日志（失败时只记录错误类别，例如 "Wrong password"）。
+
+## 常驻与 D-Bus
+
+程序是常驻服务：解锁只隐藏窗口（并释放视频解码资源），进程保持运行。
+
+D-Bus 接口（会话总线）：
+
+```bash
+# 重新上锁
+dbus-send --session --dest=org.lumina.Lock --type=method_call \
+    /org/lumina/Lock org.lumina.Lock.lock
+
+# 退出常驻进程
+dbus-send --session --dest=org.lumina.Lock --type=method_call \
+    /org/lumina/Lock org.lumina.Lock.quit
+```
+
+服务名 `org.lumina.Lock`、对象路径 `/org/lumina/Lock`、接口 `org.lumina.Lock`，方法 `lock` / `quit`，属性 `locked`。这是替换 dde-lock 的接入点——后续可将服务名/接口映射到 `com.deepin.dde.LockService` 的 `Lock()`。
 
 ## 安全边界（重要）
 
@@ -113,6 +132,9 @@ QT_QPA_PLATFORM=offscreen ./build/lumina-lock --test-exit-ms 2000
 
 # 真实显示环境短暂运行
 ./build/lumina-lock --test-exit-ms 3000
+
+# PAM 后端单测（密码从 stdin 读入，不出现在进程列表中）
+echo "wrong-password" | ./build/lumina-pam-test $(whoami)
 ```
 
 ## 已知问题
@@ -123,3 +145,6 @@ QT_QPA_PLATFORM=offscreen ./build/lumina-lock --test-exit-ms 2000
   锁屏的密码框已通过 `TextInput.Password` 隐藏回显，正式部署时应进一步禁用输入法。
 - PAM 认证需要在有真实 PAM 配置的环境下验证（默认服务 `login`）。本仓库以
   UI/认证原型为交付目标，未做 setuid 或专用服务文件的部署集成。
+- 原型通过 `showFullScreen()` + `raise()`/`requestActivate()` 显示，**不会抢占**
+  键盘焦点或拦截全局快捷键；X11 的 input grab / Wayland 的 lock surface 属于
+  后续安全化工作（见“安全边界”）。
