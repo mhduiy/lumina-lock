@@ -14,6 +14,7 @@ Window {
     readonly property real u: height / 1080
 
     WallpaperHost {
+        id: wallpaperHost
         anchors.fill: parent
         playVideo: false
     }
@@ -27,6 +28,9 @@ Window {
     ClockView {
         unit: root.u
         compact: false
+        glassSource: wallpaperHost
+        glassRefreshToken: wallpaperHost.ready ? 1 : 0
+        glassLive: WallpaperManager.isVideo
         anchors.centerIn: parent
     }
 }

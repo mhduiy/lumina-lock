@@ -13,6 +13,12 @@ Item {
     property string errorText: ""
     property bool authenticating: false
 
+    // Frosted backdrop plumbing, forwarded to the password pill.
+    property Item glassSource: null
+    property int glassRefreshToken: 0
+    property bool glassLive: false
+    property real glassDim: 0
+
     signal submit(string password)
     signal cancel()
 
@@ -20,7 +26,7 @@ Item {
     scale: 0.96 + 0.04 * reveal
     transform: Translate { y: (1 - reveal) * (26 * unit) }
     Behavior on reveal {
-        NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: Theme.motionDuration; easing.type: Easing.OutCubic }
     }
 
     width: 340 * unit
@@ -76,6 +82,15 @@ Item {
             placeholderText: "Password"
             error: auth.errorText !== ""
             busy: auth.authenticating
+            glassSource: auth.glassSource
+            // The pill's top-left in wallpaper coordinates. Built only from
+            // tracked properties; the reveal transform is deliberately ignored
+            // (it is zero once the panel has settled).
+            glassOrigin: Qt.point(auth.x + column.x + field.x,
+                                  auth.y + column.y + field.y)
+            glassRefreshToken: auth.glassRefreshToken
+            glassLive: auth.glassLive
+            glassDim: auth.glassDim
             onAccepted: auth.submit(field.text)
             onEscapePressed: auth.cancel()
             onTextEdited: auth.clearError()

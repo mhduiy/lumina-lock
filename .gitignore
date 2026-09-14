@@ -13,3 +13,11 @@ Makefile
 .DS_Store
 compile_commands.json
 .qmake.stash
+
+# Debian packaging build artifacts
+debian/.debhelper/
+debian/lumina-lock/
+debian/*.debhelper.log
+debian/*.substvars
+debian/files
+debian/debhelper-build-stamp

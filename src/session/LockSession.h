@@ -31,7 +31,11 @@ public:
     QString hostName() const { return m_hostName; }
     bool authenticating() const { return m_authenticating; }
     bool locked() const { return m_locked; }
+    bool visible() const { return m_locked; }
     QString errorMessage() const { return m_errorMessage; }
+
+    /** Set the initial lock state before the UI is created (startup only). */
+    void setLocked(bool locked) { m_locked = locked; }
 
     /** Override the target user (CLI --user). */
     void setUser(const QString &user);
@@ -48,6 +52,13 @@ public:
 
     Q_INVOKABLE void clearError();
 
+    // dde-lock `lockFront` semantics (driven by the LockService adaptor).
+    void show();
+    void showUserList();
+    void showAuth(bool active);
+    void suspend(bool enable);
+    void hibernate(bool enable);
+
 public slots:
     /** Re-engage the lock (exposed on D-Bus for session integration). */
     void lock();
@@ -62,6 +73,14 @@ signals:
     void authenticationFinished(bool success, const QString &message);
     void unlocked();
     void quitRequested();
+
+    // Emitted so QML can jump straight to the auth state when ShowAuth(true)
+    // arrives from the session.
+    void showAuthRequested();
+
+    // dde-lock-compatible signals (relayed by the LockService adaptor).
+    void Visible(bool visible);
+    void ChangKey(QString key);
 
 private:
     void onAuthFinished(bool success, const QString &message);

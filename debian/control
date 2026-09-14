@@ -1,0 +1,36 @@
+Source: lumina-lock
+Section: x11
+Priority: optional
+Maintainer: Lumina <lumina@example.com>
+Build-Depends: debhelper (>= 13),
+ cmake,
+ qt6-base-dev,
+ qt6-declarative-dev,
+ qt6-multimedia-dev,
+ libpam0g-dev,
+ libxcb1-dev,
+ libdtkcore-dev,
+ dde-control-center-dev
+Standards-Version: 4.6.2
+Homepage: https://example.com/lumina-lock
+
+Package: lumina-lock
+Architecture: any
+Pre-Depends: dpkg (>= 1.15.0)
+Depends: ${shlibs:Depends}, ${misc:Depends}, dde-session-shell (>= 6.0.0), dde-control-center, qml6-module-qtquick-dialogs, qml6-module-qtquick-effects, qml6-module-qtquick-shapes
+Description: Minimal modern Linux lock screen (drop-in dde-lock replacement)
+ A visual-first, minimal Linux lock screen built on C++17 / Qt 6 / QML:
+ static-image and video wallpapers, PAM authentication, multi-screen support
+ and dde-lock's D-Bus surface (org.deepin.dde.LockFront1).
+ .
+ This package takes over /usr/bin/dde-lock. The wrapper owned by
+ dde-session-shell is diverted aside (restored automatically on removal), so
+ every DDE component that locks the screen — session manager, dock, hotkeys,
+ suspend/resume — drives Lumina Lock instead, while dde-session-shell itself
+ (and with it the lightdm greeter) stays installed and untouched.
+ .
+ The D-Bus service file, PAM config and desktop entry are the ones shipped by
+ dde-session-shell / dde-session; their Exec lines already point at
+ /usr/bin/dde-lock. A systemd user drop-in adapts dde-session's
+ dde-lock.service (Type=simple, ExecStart with --daemon) to this non-forking
+ process. See README for the full mechanism and limitations.

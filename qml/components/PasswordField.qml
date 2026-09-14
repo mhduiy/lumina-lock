@@ -1,8 +1,9 @@
 import QtQuick
+import QtQuick.Shapes
 import Lumina 1.0
 
 // A purpose-built password field: no default control chrome, just a rounded
-// glassy pill with a dot-masked input and a tiny busy spinner.
+// frosted glass pill with a dot-masked input and a busy arc.
 Item {
     id: root
 
@@ -12,6 +13,14 @@ Item {
     property bool error: false
     property bool busy: false
 
+    // Frosted backdrop plumbing, forwarded from the scene. See GlassPanel for
+    // why `glassOrigin` has to be a plain tracked-property binding.
+    property Item glassSource: null
+    property point glassOrigin: Qt.point(0, 0)
+    property int glassRefreshToken: 0
+    property bool glassLive: false
+    property real glassDim: 0
+
     signal accepted()
     signal escapePressed()
     signal textEdited()
@@ -19,18 +28,18 @@ Item {
     width: 300 * unit
     height: 52 * unit
 
-    Rectangle {
+    GlassPanel {
         id: bg
         anchors.fill: parent
         radius: height / 2
-        color: Theme.surface
-        border.width: 1
-        border.color: root.error ? Theme.error
-                                 : (input.activeFocus ? Theme.surfaceBorderFocus
-                                                      : Theme.surfaceBorder)
-        Behavior on border.color {
-            ColorAnimation { duration: 200 }
-        }
+        background: root.glassSource
+        sourceOrigin: root.glassOrigin
+        refreshToken: root.glassRefreshToken
+        liveSource: root.glassLive
+        dim: root.glassDim
+        borderColor: root.error ? Theme.error
+                                : (input.activeFocus ? Theme.surfaceBorderFocus
+                                                     : Theme.surfaceBorder)
     }
 
     Text {
@@ -39,7 +48,7 @@ Item {
         anchors.leftMargin: 20 * root.unit
         anchors.verticalCenter: parent.verticalCenter
         text: root.placeholderText
-        color: Theme.textTertiary
+        color: Theme.textSecondary
         font.family: Theme.fontFamily
         font.pixelSize: 15 * root.unit
         visible: input.text.length === 0
@@ -66,44 +75,50 @@ Item {
         }
     }
 
-    // Small orbiting dot used as an "authenticating…" spinner.
+    // "Authenticating…" indicator: a fifth of the ring sweeps around rather
+    // than a single travelling dot, so the motion reads at a glance.
     Item {
         id: spinner
         anchors.right: parent.right
-        anchors.rightMargin: 18 * root.unit
+        anchors.rightMargin: 16 * root.unit
         anchors.verticalCenter: parent.verticalCenter
-        width: 14 * root.unit
-        height: 14 * root.unit
+        width: 18 * root.unit
+        height: 18 * root.unit
         visible: root.busy
 
+        readonly property real stroke: 2 * root.unit
+        // Stroke centreline, so the arc rides exactly on the track ring.
+        readonly property real ringRadius: width / 2 - stroke / 2
+
         Rectangle {
-            id: ring
             anchors.fill: parent
             radius: width / 2
             color: "transparent"
-            border.width: 2 * root.unit
-            border.color: Qt.rgba(1, 1, 1, 0.20)
+            border.width: spinner.stroke
+            border.color: Qt.rgba(1, 1, 1, 0.18)
         }
 
-        // Only this layer rotates; the dot is placed at the 12 o'clock
-        // position on the ring's stroke (ring radius − stroke/2), so it
-        // travels exactly along the visible circle instead of outside it.
-        Item {
-            id: orbit
+        Shape {
             anchors.fill: parent
-            rotation: 0
-            Rectangle {
-                x: orbit.width / 2 - width / 2
-                y: orbit.height / 2 - (orbit.width / 2 - 1 * root.unit) - height / 2
-                width: 3 * root.unit
-                height: 3 * root.unit
-                radius: width / 2
-                color: Theme.accent
+            preferredRendererType: Shape.CurveRenderer
+            ShapePath {
+                strokeColor: Theme.accent
+                strokeWidth: spinner.stroke
+                fillColor: "transparent"
+                capStyle: ShapePath.RoundCap
+                PathAngleArc {
+                    centerX: Math.round(spinner.width / 2)
+                    centerY: Math.round(spinner.height / 2)
+                    radiusX: spinner.ringRadius
+                    radiusY: spinner.ringRadius
+                    startAngle: 0
+                    sweepAngle: 72 // a fifth of the circle
+                }
             }
             RotationAnimator on rotation {
                 from: 0
                 to: 360
-                duration: 900
+                duration: 1100
                 loops: Animation.Infinite
                 running: root.busy
             }

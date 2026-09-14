@@ -1,0 +1,66 @@
+{
+    "magic": "dsg.config.meta",
+    "version": "1.0",
+    "contents": {
+        "wallpaperType": {
+            "value": "none",
+            "serial": 0,
+            "flags": [],
+            "name": "Wallpaper type",
+            "name[zh_CN]": "壁纸类型",
+            "description": "锁屏壁纸类型：none（默认内置壁纸）/ static（静态图片）/ video（动态视频）。",
+            "permissions": "readwrite",
+            "visibility": "private"
+        },
+        "wallpaperPath": {
+            "value": "",
+            "serial": 0,
+            "flags": [],
+            "name": "Wallpaper image path",
+            "name[zh_CN]": "静态壁纸路径",
+            "description": "锁屏静态壁纸图片的本地路径。",
+            "permissions": "readwrite",
+            "visibility": "private"
+        },
+        "videoPath": {
+            "value": "",
+            "serial": 0,
+            "flags": [],
+            "name": "Wallpaper video path",
+            "name[zh_CN]": "动态壁纸视频路径",
+            "description": "锁屏动态壁纸视频的本地路径。",
+            "permissions": "readwrite",
+            "visibility": "private"
+        },
+        "posterPath": {
+            "value": "",
+            "serial": 0,
+            "flags": [],
+            "name": "Wallpaper video poster path",
+            "name[zh_CN]": "动态壁纸封面路径",
+            "description": "锁屏动态壁纸的封面/首帧图片路径，用于避免视频首帧黑屏。",
+            "permissions": "readwrite",
+            "visibility": "private"
+        },
+        "clockWeight": {
+            "value": "light",
+            "serial": 0,
+            "flags": [],
+            "name": "Clock font weight",
+            "name[zh_CN]": "时间字体粗细",
+            "description": "锁屏时间字体的粗细：thin / extralight / light / normal / medium / demibold / bold。",
+            "permissions": "readwrite",
+            "visibility": "private"
+        },
+        "dateWeight": {
+            "value": "medium",
+            "serial": 0,
+            "flags": [],
+            "name": "Date font weight",
+            "name[zh_CN]": "日期字体粗细",
+            "description": "锁屏日期字体的粗细：thin / extralight / light / normal / medium / demibold / bold。",
+            "permissions": "readwrite",
+            "visibility": "private"
+        }
+    }
+}

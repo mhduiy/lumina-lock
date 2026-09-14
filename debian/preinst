@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+# Take over /usr/bin/dde-lock from dde-session-shell. The original wrapper is
+# diverted to /usr/bin/dde-lock.dde-session-shell and restored on removal, so
+# dde-session-shell (which also contains the lightdm greeter) stays installed
+# and intact. dpkg-divert is idempotent across reinstall/upgrade.
+case "$1" in
+    install|upgrade|abort-upgrade)
+        dpkg-divert --package lumina-lock --add --rename \
+            --divert /usr/bin/dde-lock.dde-session-shell /usr/bin/dde-lock
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

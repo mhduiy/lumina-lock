@@ -17,9 +17,14 @@ Window {
     readonly property real u: height / 1080
     property bool unlocking: false
 
-    // Grabbing live video frames for a shader blur is unreliable across Qt
-    // video backends, so blur is only enabled for static image wallpapers.
-    readonly property bool blurAvailable: !WallpaperManager.isVideo
+    // Frames rendered so far; the warm-up only has to happen once per window,
+    // since Qt keeps the compiled program for the renderer's lifetime.
+    // Counting *frames* rather than using a timer matters: the window's first
+    // paint can land later than any wall clock window would allow for, and a
+    // warm-up that ends before the first frame never draws the effect at all.
+    property int warmupFrames: 0
+    readonly property bool blurWarmup: root.warmupFrames < 12
+    onFrameSwapped: if (root.warmupFrames < 12) root.warmupFrames++
 
     // --- Wallpaper (bottom) ---
     WallpaperHost {
@@ -29,15 +34,28 @@ Window {
     }
 
     // Soft blur over the wallpaper while authenticating.
+    //
+    // `blurEnabled` stays true from startup so this effect's blur items exist
+    // and stay sized, and it is *drawn* for the first frames the window renders
+    // (at amount 0, which is a plain copy of the wallpaper) so the level-3 blur
+    // shader is compiled and its multi-level FBO chain allocated up front.
+    //
+    // Both matter: turning the effect on for the first time inside the
+    // Idle -> Authenticating transition froze the animation for ~150 ms
+    // (measured: 9 identical frames). But leaving it drawn permanently is worse
+    // in the other direction — a video wallpaper dirties the scene every frame,
+    // and an always-visible full-screen blur then runs on every idle frame
+    // (measured: ~5 cores of software rasterisation versus none for a static
+    // wallpaper).
     MultiEffect {
         id: blur
         anchors.fill: parent
         source: wallpaperHost
-        blurEnabled: content.blurAmount > 0.001
+        blurEnabled: true
         blurMax: 40
         blur: content.blurAmount
         autoPaddingEnabled: false
-        visible: root.blurAvailable && content.blurAmount > 0.001
+        visible: root.blurWarmup || content.blurAmount > 0.001
     }
 
     // Dim layer.
@@ -74,15 +92,27 @@ Window {
         // back to Idle instantly instead of animating from the previous state.
         property bool animating: true
 
+        // Entry staging: the clock (and the glass behind it) only fades in once
+        // the wallpaper has something to draw, so nothing pops in over a
+        // half-decoded image.
+        property bool sceneReady: false
+
         state: "Idle"
 
         ClockView {
             id: clock
             unit: root.u
             compact: content.state !== "Idle"
+            glassSource: wallpaperHost
+            glassRefreshToken: wallpaperHost.ready ? 1 : 0
+            glassLive: WallpaperManager.isVideo
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
             anchors.verticalCenterOffset: content.clockOffset
+            opacity: content.sceneReady ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation { duration: 480; easing.type: Easing.OutCubic }
+            }
         }
 
         AuthView {
@@ -90,6 +120,10 @@ Window {
             unit: root.u
             reveal: content.authReveal
             authenticating: LockSession.authenticating
+            glassSource: wallpaperHost
+            glassRefreshToken: wallpaperHost.ready ? 1 : 0
+            glassLive: WallpaperManager.isVideo
+            glassDim: content.dimOpacity
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             anchors.bottomMargin: root.height * 0.14
@@ -106,7 +140,7 @@ Window {
             color: Theme.textTertiary
             font.family: Theme.fontFamily
             font.pixelSize: 13 * root.u
-            opacity: content.state === "Idle" ? 1 : 0
+            opacity: content.state === "Idle" && content.sceneReady ? 1 : 0
             Behavior on opacity {
                 NumberAnimation { duration: 250 }
             }
@@ -131,19 +165,36 @@ Window {
 
         Behavior on dimOpacity {
             enabled: content.animating
-            NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.motionDuration; easing.type: Easing.OutCubic }
         }
         Behavior on blurAmount {
             enabled: content.animating
-            NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.motionDuration; easing.type: Easing.OutCubic }
         }
         Behavior on clockOffset {
             enabled: content.animating
-            NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.motionDuration; easing.type: Easing.OutCubic }
         }
         Behavior on authReveal {
             enabled: content.animating
-            NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.motionDuration; easing.type: Easing.OutCubic }
+        }
+    }
+
+    // Entry staging. Polls instead of binding so the clock can wait for the
+    // wallpaper yet still appear on a short fixed beat, with a hard deadline so
+    // a wallpaper that never loads cannot leave the clock hidden.
+    Timer {
+        id: entryTimer
+        interval: 240
+        repeat: true
+        property int ticks: 0
+        onTriggered: {
+            ++ticks
+            if (!content.sceneReady && (wallpaperHost.ready || ticks >= 4)) {
+                content.sceneReady = true
+                stop()
+            }
         }
     }
 
@@ -202,7 +253,7 @@ Window {
     }
 
     // Re-lock: snap the scene back to Idle and restore full opacity before
-    // (or as) the surfaces are shown again.
+    // (or as) the surfaces are shown again, then replay the entry staging.
     function resetForLock() {
         content.animating = false
         root.unlocking = false
@@ -211,26 +262,29 @@ Window {
         content.blurAmount = 0
         content.clockOffset = 0
         content.authReveal = 0
+        content.opacity = 1
+        content.sceneReady = false
         root.opacity = 1
-        content.scale = 1
         auth.reset()
         keyCatcher.forceActiveFocus()
+        entryTimer.ticks = 0
+        entryTimer.restart()
         content.animating = true
     }
 
-    // Natural exit: fade the whole surface and scale the content slightly,
-    // then notify the session.
+    // Natural exit: drop the content first (cheap — it takes the large clock
+    // type off screen), then fade the window so the desktop shows through.
+    // Deliberately no content scaling: rescaling the clock every frame while
+    // the wallpaper was still landing is what made this stutter.
     SequentialAnimation {
         id: unlockAnim
-        ParallelAnimation {
-            NumberAnimation {
-                target: root; property: "opacity"; to: 0
-                duration: 440; easing.type: Easing.InOutCubic
-            }
-            NumberAnimation {
-                target: content; property: "scale"; to: 1.04
-                duration: 440; easing.type: Easing.InOutCubic
-            }
+        NumberAnimation {
+            target: content; property: "opacity"; to: 0
+            duration: 220; easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            target: root; property: "opacity"; to: 0
+            duration: 280; easing.type: Easing.OutCubic
         }
         ScriptAction { script: LockSession.unlock() }
     }
@@ -240,6 +294,9 @@ Window {
         function onLockedChanged(locked) {
             if (locked)
                 root.resetForLock()
+        }
+        function onShowAuthRequested() {
+            root.wake()
         }
         function onAuthenticationFinished(success, message) {
             if (success) {
@@ -253,5 +310,6 @@ Window {
 
     Component.onCompleted: {
         keyCatcher.forceActiveFocus()
+        entryTimer.start()
     }
 }

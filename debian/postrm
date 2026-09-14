@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove|purge|disappear|abort-install|abort-upgrade)
+        # Our /usr/bin/dde-lock is a symlink to lumina-lock; drop it before
+        # restoring dde-session-shell's diverted wrapper. dpkg has already
+        # removed our files on remove/purge; the -L guard covers aborted
+        # installs where they are still present.
+        if [ -L /usr/bin/dde-lock ]; then
+            rm -f /usr/bin/dde-lock
+        fi
+        dpkg-divert --package lumina-lock --remove --rename \
+            --divert /usr/bin/dde-lock.dde-session-shell /usr/bin/dde-lock || true
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

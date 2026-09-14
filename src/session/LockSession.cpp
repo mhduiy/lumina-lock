@@ -1,8 +1,11 @@
 #include "LockSession.h"
 
 #include "auth/PamAuthenticator.h"
+#include "session/dbusnames.h"
 
 #include <QCoreApplication>
+#include <QDBusConnection>
+#include <QDBusInterface>
 #include <QDebug>
 
 #include <pwd.h>
@@ -63,6 +66,7 @@ void LockSession::unlock()
         return;
     m_locked = false;
     emit lockedChanged(false);
+    emit Visible(false);
     emit unlocked();
 }
 
@@ -72,6 +76,46 @@ void LockSession::lock()
         return;
     m_locked = true;
     emit lockedChanged(true);
+    emit Visible(true);
+}
+
+void LockSession::show()
+{
+    lock();
+}
+
+void LockSession::showUserList()
+{
+    // No multi-user switcher in this lock: showing the lock itself is the safe
+    // fallback so the screen is never left uncovered.
+    lock();
+}
+
+void LockSession::showAuth(bool active)
+{
+    lock();
+    if (active)
+        emit showAuthRequested();
+}
+
+void LockSession::suspend(bool enable)
+{
+    // Resume from suspend: dde-lock only re-engages the lock when the power
+    // daemon's SleepLock is on; honour that setting (missing service → lock,
+    // which is the safe default).
+    if (!enable) {
+        QDBusInterface power(LOCK_POWER_SERVICE, LOCK_POWER_PATH,
+                             LOCK_POWER_SERVICE, QDBusConnection::sessionBus());
+        const QVariant sleepLock = power.property("SleepLock");
+        if (sleepLock.isValid() && !sleepLock.toBool())
+            return; // sleep-lock disabled: resume straight to the desktop
+    }
+    lock();
+}
+
+void LockSession::hibernate(bool /*enable*/)
+{
+    lock();
 }
 
 void LockSession::quit()

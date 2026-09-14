@@ -7,6 +7,8 @@
         <file>qml/AuthView.qml</file>
         <file>qml/WallpaperHost.qml</file>
         <file>qml/components/PasswordField.qml</file>
+        <file>qml/components/GlassPanel.qml</file>
+        <file>qml/components/GlassText.qml</file>
         <file>assets/wallpapers/default.jpg</file>
         <file>assets/wallpapers/default-video.mp4</file>
     </qresource>

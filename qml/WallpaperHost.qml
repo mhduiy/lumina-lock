@@ -19,6 +19,21 @@ Item {
     readonly property bool isVideo: WallpaperManager.isVideo
     readonly property bool isStatic: WallpaperManager.type === "static"
 
+    property bool videoFailed: false
+
+    // True once the surface has something worth drawing. The lock scene uses
+    // this to stage the clock in *after* the wallpaper has landed, so the clock
+    // never pops in over a half-decoded image.
+    readonly property bool ready: {
+        if (root.isStatic)
+            return staticImage.status === Image.Ready || staticImage.status === Image.Error
+        if (root.isVideo)
+            return root.videoFailed
+                   || (videoLoader.item !== null && videoLoader.item.started)
+                   || poster.status === Image.Ready || poster.status === Image.Error
+        return true // built-in gradient only
+    }
+
     // Base layer: never show a pure black frame while content loads.
     Rectangle {
         anchors.fill: parent
@@ -43,6 +58,8 @@ Item {
         onStatusChanged: {
             if (status === Image.Ready)
                 staticImage.opacity = 1
+            else if (status === Image.Error)
+                root.videoFailed = true
         }
         Connections {
             target: WallpaperManager
@@ -68,6 +85,9 @@ Item {
         Item {
             id: videoItem
             property bool playing: false
+            // Set once a frame has actually been shown, so the poster never
+            // covers the video again.
+            property bool started: false
 
             MediaPlayer {
                 id: player
@@ -81,9 +101,12 @@ Item {
                 autoPlay: true
                 onPlaybackStateChanged: {
                     videoItem.playing = (player.playbackState === MediaPlayer.PlayingState)
+                    if (videoItem.playing)
+                        videoItem.started = true
                 }
                 onErrorOccurred: (error, errorString) => {
                     console.warn("WallpaperHost: video error:", errorString)
+                    root.videoFailed = true
                 }
             }
 
@@ -105,7 +128,7 @@ Item {
                  && (!root.playVideo
                      || !videoLoader.active
                      || videoLoader.item === null
-                     || !videoLoader.item.playing)
+                     || !videoLoader.item.started)
         source: WallpaperManager.poster
         fillMode: Image.PreserveAspectCrop
         asynchronous: true

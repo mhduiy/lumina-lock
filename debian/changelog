@@ -1,0 +1,142 @@
+lumina-lock (0.4.5-1) unstable; urgency=medium
+
+  * Fix the frozen start of the first Idle -> Authenticating transition in a
+    lock process. The full-screen wallpaper blur was created with
+    visible/blurEnabled off and switched on only when the transition begins, so
+    its first render — compiling the level-3 blur shader and allocating the
+    full-resolution multi-level FBO chain — landed inside the animation.
+    Measured by recording the transition at 60 fps: 9 identical frames before,
+    none after.
+    The effect's blur items are now enabled from startup and it is drawn (at
+    amount 0, which is a plain copy of the wallpaper) for the first frames the
+    window renders, which is what actually compiles the shader. It is then
+    hidden again: a video wallpaper dirties the scene every frame, and leaving
+    the blur drawn permanently cost ~2.9 cores of software rasterisation on
+    every idle frame (measured 483% vs 199% of one core).
+    The warm-up counts rendered *frames*, not wall-clock time — the window's
+    first paint can land later than any timer window would allow for, and a
+    warm-up that ends before the first frame never draws the effect at all.
+  * README: the transition description no longer claims the video is frozen
+    during the exit (that was removed in 0.4.2).
+
+ -- Lumina <lumina@example.com>  Mon, 14 Sep 2026 15:10:00 +0800
+
+lumina-lock (0.4.4-1) unstable; urgency=medium
+
+  * Pull the frosted glass edge softening back from ~4px to ~1.5px. 0.4.3
+    removed the stair-stepping but at the cost of visibly out-of-focus type.
+    Antialiasing at a fixed output resolution is a one-pixel ramp that no
+    amount of supersampling can widen (rendering at 2x and scaling down just
+    re-derives the same per-pixel coverage), so smoothing a large display
+    glyph beyond its own coverage is inherently a blur. The chosen amount
+    drops the steepest edge steps by ~20% while keeping the letterform crisp;
+    GlassText.maskSoftness is the single knob.
+
+ -- Lumina <lumina@example.com>  Mon, 14 Sep 2026 11:45:00 +0800
+
+lumina-lock (0.4.3-1) unstable; urgency=medium
+
+  * Frosted glass is now antialiased for real. The previous fix only shaped
+    the mask's alpha ramp; the remaining stair steps came from the mask
+    textures being consumed at 1:1, where a curve's edge can only ever be one
+    pixel wide. The masks are now filtered (layer.smooth) and softened by a
+    blur applied *inside* the mask layer.
+    Note for future edits: a `layer.effect` on a mask item silently does
+    nothing — Qt applies a layer effect while nesting the layer into the
+    scene, and the mask item is never drawn — and the mask blur must use
+    blurMax <= 16, because at blurMax 32 the blur runs at quarter resolution
+    and the amount quantises into coarse steps (0.08 and 0.16 rendered
+    identically).
+  * Rounded shapes (the mask, the pill's fill and its 1px hairline) request
+    antialiasing.
+  * The password placeholder uses a stronger text colour, now that the pill
+    itself is dimmed while authenticating.
+
+ -- Lumina <lumina@example.com>  Mon, 14 Sep 2026 10:30:00 +0800
+
+lumina-lock (0.4.2-1) unstable; urgency=medium
+
+  * Antialias the frosted glass. The mask was sampled through a hard alpha
+    threshold, which discarded the text renderer's antialiasing and left
+    jagged glyph strokes and jagged rounded corners; the mask now uses a
+    smooth alpha ramp.
+  * The clock's font-size transition animates again. The type is now driven by
+    scalar font properties instead of an alias to the child Text's grouped
+    `font`, which a Behavior cannot target — that alias turned the Idle →
+    Authenticating transition into a hard switch. All scene transitions also
+    share one duration and easing, so the clock, the authentication panel and
+    the background dimming move as a single gesture.
+  * The password field no longer stays bright while the rest of the scene dims
+    during authentication: the glass mirrors the scene dimming, which it does
+    not inherit because it samples the wallpaper rather than the composed
+    scene.
+  * Unlocking no longer pauses a video wallpaper — playback continues through
+    the exit fade.
+
+ -- Lumina <lumina@example.com>  Thu, 11 Sep 2026 19:40:00 +0800
+
+lumina-lock (0.4.1-1) unstable; urgency=medium
+
+  * The clock is now frosted-glass type, not text on a glass card: the glyphs
+    act as a mask so the blurred wallpaper shows through the letterforms (the
+    iOS lock-screen look), with a glyph-shaped shadow so the time stays
+    readable over any wallpaper. The password field keeps its rounded glass
+    panel. The sample is clipped to the glyph/panel shape, so no bright
+    rectangle leaks out while the scene above the wallpaper is dimmed.
+  * Blur video wallpapers too. The glass used to be disabled for video
+    wallpapers on the assumption that live video frames could not be captured
+    into a shader; in practice sampling the VideoOutput works, so video now
+    gets the same frosted look. Video samples every frame, static wallpapers
+    stay on the on-demand path.
+
+ -- Lumina <lumina@example.com>  Thu, 11 Sep 2026 19:20:00 +0800
+
+lumina-lock (0.4.0-1) unstable; urgency=medium
+
+  * Lock-screen polish:
+    - Frosted glass behind the clock/date and the password field: each panel
+      samples only the wallpaper region it covers, blurs it and clips it to a
+      rounded shape, so an idle lock screen does no per-frame blur work. Falls
+      back to a translucent surface on video wallpapers and on software
+      scene-graph backends.
+    - Clock and date font weight are configurable (thin … bold) via DConfig
+      and the control-center plugin.
+    - Busy indicator is now an arc covering a fifth of the ring instead of a
+      single travelling dot.
+    - Unlock transition: the video decoder is frozen before the fade starts,
+      content fades before the window, and the per-frame content scaling is
+      gone — that scaling of the large clock type was the main source of
+      stutter, worst right after the wallpaper had loaded.
+    - The clock now fades in on a short beat after lock (and once the
+      wallpaper can draw), instead of popping in over a half-decoded image.
+  * Keyboard and pointer are grabbed while locked (X11), so window-manager
+    shortcuts such as Alt+Tab can no longer switch away from the lock; the
+    grab is released on unlock.
+  * Package now depends on qml6-module-qtquick-effects and
+    qml6-module-qtquick-shapes (and, since the previous build,
+    qml6-module-qtquick-dialogs); the control-center plugin uses Qt Quick
+    dialogs instead of QFileDialog, which aborted the control center because
+    it runs on QGuiApplication.
+
+ -- Lumina <lumina@example.com>  Thu, 11 Sep 2026 18:40:00 +0800
+
+lumina-lock (0.3.0-1) unstable; urgency=medium
+
+  * Add control-center wallpaper configuration: a dde-control-center plugin
+    (plugins_v1.1/luminalock) edits the org.lumina.lock DConfig keys
+    (wallpaperType / wallpaperPath / videoPath / posterPath), and the lock
+    applies them on startup and live via DConfig change notifications. CLI
+    --wallpaper / --video still override the configured value.
+  * Drop-in dde-lock replacement for DDE: /usr/bin/dde-lock is taken over via
+    dpkg-divert (dde-session-shell stays installed, lightdm greeter untouched,
+    original wrapper restored on removal); the org.deepin.dde.LockFront1
+    D-Bus surface (Show / ShowAuth / Suspend / Hibernate / Visible) matches
+    dde-lock, and the Power1 SleepLock setting is honoured on suspend resume.
+  * X11 lock windows carry _DEEPIN_LOCK_SCREEN / _DEEPIN_NET_STARTUP and use
+    dde-lock's window flags so the deepin window manager keeps them on top and
+    focused.
+  * A systemd user drop-in adapts dde-session's dde-lock.service
+    (Type=simple, ExecStart=/usr/bin/dde-lock --daemon --pam-service dde-lock)
+    to this non-forking process.
+
+ -- Lumina <lumina@example.com>  Thu, 10 Sep 2026 20:30:00 +0800

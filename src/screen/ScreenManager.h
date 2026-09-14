@@ -29,9 +29,17 @@ public:
     QQuickWindow *primaryWindow() const { return m_primaryWindow; }
 
 public slots:
-    void start();
+    void start(bool visible = true);
     void showAll();
     void hideAll();
+
+    /**
+     * Enable/disable the X11 keyboard + pointer grabs. Without the grab the
+     * window manager still sees Alt+Tab, Super and friends and switches windows
+     * behind the lock; with it every keystroke and click belongs to the lock
+     * surface. No-op where the platform owns shortcuts (Wayland).
+     */
+    void setInputGrabbed(bool grabbed);
 
 private slots:
     void onScreenAdded(QScreen *screen);
@@ -46,4 +54,6 @@ private:
     QUrl m_secondaryUrl;
     QHash<QScreen *, QQuickWindow *> m_windows;
     QQuickWindow *m_primaryWindow = nullptr;
+    bool m_visible = true;
+    bool m_grabInput = false;
 };
