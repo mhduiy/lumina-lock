@@ -1,3 +1,161 @@
+lumina-lock (0.4.11-1) unstable; urgency=medium
+
+  * Restored the clock's entry growth, this time on purpose. Removing the
+    accidental growth (the one that ran from zero) had also removed any size
+    change from the entry, leaving only the fade. The type size is now a pure
+    function of `unit` and two dimensionless progress values, `entryProgress`
+    and `compactProgress`; only the progress values animate, and nothing
+    animates a pixel size. A Behavior on the size can express neither: with the
+    window sized after the first layout, an always-on Behavior animated the
+    type out of nothing, and a Behavior gated by the reveal snapped instead,
+    because the gate and the value it guards are released by the same signal —
+    Qt assigns the new size before the gate opens. The clock now arrives at
+    82% and settles over 560 ms, slightly longer than the 480 ms fade, so the
+    growth is still in progress while the clock is visible. Measured: the
+    glyph run grows about 10% across the visible part of the entry.
+
+  * Fixed the wallpaper jumping from the flat cover colour to the video, and
+    restructured how the wallpaper reveals itself. The cover used to sit
+    underneath the video, so the video could only ever appear on top of it in
+    a single frame. Every layer is now revealed by fading the layer above it
+    out, never by fading content in: a Rectangle's and an Image's opacity
+    reliably blend, a VideoOutput's does not. The cover is the last child,
+    hides the whole stack until there is something to show, and dissolves away
+    when there is. Verified against a bright moving test video: the transition
+    is a bell-shaped cross-dissolve over ~11 frames, the signature of two
+    different images blending, where a cut would be one frame at full
+    difference with nothing either side.
+  * The reveal also waits for the video's first frame to have been painted
+    rather than merely delivered, and for the cover to finish dissolving before
+    the clock is allowed to arrive, so the glass letterforms never sample a
+    half-dissolved backdrop. Poster and cover now key off the sink's
+    videoFrameChanged instead of the playback state, which is reached before
+    anything is on screen.
+  * Static images no longer fade in on their own; the cover's dissolve covers
+    that case and the video case with one mechanism.
+
+ -- Lumina <lumina@example.com>  Tue, 15 Sep 2026 20:15:00 +0800
+
+lumina-lock (0.4.10-1) unstable; urgency=medium
+
+  * Fixed the lock screen flashing its content on every re-lock: the clock
+    appeared at full opacity, faded out, then faded back in. The surfaces stay
+    alive between locks, so when a re-lock resets the scene the clock was
+    still at the opacity the previous lock left it at. resetForLock() clears
+    `animating` precisely so the layout snaps back to Idle instead of
+    animating, but the clock's entry reveal and the hint's reveal did not
+    honour it: they animated the *hide* with the same 480 ms fade that is
+    meant for the reveal, while the window was being shown at the same time.
+    Both are now gated on `animating`, like the transition properties already
+    were.
+    Measured over a lock -> unlock -> lock cycle, the clock region used to run
+    97 -> 95/89/87/89/93/96/97 (down, then back up) once the window reappeared;
+    it now holds the wallpaper's own brightness and rises monotonically once.
+  * The cold-start path never showed this: a plain launch starts already
+    locked, so resetForLock() is never called. Only the resident daemon
+    (`--daemon`, the mode the package installs) reaches it, on the second and
+    every later lock.
+
+ -- Lumina <lumina@example.com>  Tue, 15 Sep 2026 20:05:00 +0800
+
+lumina-lock (0.4.9-1) unstable; urgency=medium
+
+  * Fixed the lock screen's own entry. The clock and date used to show up
+    small and fully opaque, then grow while apparently losing and regaining
+    their opacity. Two independent causes, both removed:
+    - The type size is now animated only once the scene has settled. `unit`
+      is derived from the window height, which is 0 until the window has been
+      sized, so the first layout animated the size up from nothing on every
+      lock. Until sceneReady the size snaps instead of animating.
+    - The glass text's opaque fallback no longer keys off `sampling`, which
+      is also false for the first frame or two before the item has been laid
+      out; that flashed an opaque white clock over the wallpaper until the
+      glass replaced it. The fallback now appears only when the glass
+      genuinely cannot be rendered, which is a persistent condition. The
+      entry is a single 480 ms fade at a constant size.
+  * The video wallpaper no longer cuts from its poster to the moving frame.
+    The poster hid itself within a single frame of the video starting; it now
+    cross-fades over 500 ms, so the still cover dissolves into the wallpaper.
+    The poster's visibility follows its own opacity, which keeps it alive for
+    the length of the fade.
+  * Every fade now goes through the shared MotionBehavior: the clock's entry
+    reveal, the static wallpaper's fade-in, the poster dissolve and the inline
+    error each still carried their own Behaviour and their own curve.
+    MotionBehavior takes an optional duration, so the curve lives in one place
+    and only the length varies by use.
+
+ -- Lumina <lumina@example.com>  Tue, 15 Sep 2026 19:20:00 +0800
+
+lumina-lock (0.4.8-1) unstable; urgency=medium
+
+  * Clock and date font size are configurable: 80-240 and 14-48, expressed in
+    reference pixels at a 1080px-tall screen and scaled to the actual
+    resolution, set from the control center with a spin box next to each
+    weight row. The authenticating sizes stay a fixed fraction of the idle
+    ones, so a custom size keeps the same relationship between the two states.
+    Bounds are enforced in C++ so a hand-edited config cannot shrink the clock
+    into illegibility or push the date off the screen.
+  * Retuned the transition curve. Every state-transition animation now shares
+    one curve, a standard ease-in-out cubic-bezier(0.4, 0, 0.2, 1), replacing
+    Easing.OutCubic: OutCubic spent ~58% of the motion in the first quarter of
+    the time, which reads as "jump, then creep" when a large element both moves
+    and resizes. Measured on the scene dim, the new curve is at 8% of the
+    change after 34 ms and 40% after 118 ms, where OutCubic would be at 28% and
+    75%. The curve is declared once in Theme and applied through a shared
+    MotionBehavior component, so the call sites cannot drift apart again.
+    Note for future edits: the curve must be set through `easing.bezierCurve`,
+    not `easing.type` — the type setter builds a fresh QEasingCurve and would
+    discard the control points.
+
+ -- Lumina <lumina@example.com>  Tue, 15 Sep 2026 18:10:00 +0800
+
+lumina-lock (0.4.7-1) unstable; urgency=medium
+
+  * Synchronise the authentication transition. `AuthView.reveal` is bound to
+    `content.authReveal` and *both* had a 320 ms Behavior, so the value was
+    smoothed twice and the password field lagged a whole extra duration behind
+    the clock — visible both when the field appears and when Escape returns to
+    the idle state. The panel now follows the scene's already-animated value
+    with no Behavior of its own, so one animation drives the whole transition.
+    Measured at 60 fps: clock and pill now start on the same frame and settle
+    on the same frame, in both directions.
+
+ -- Lumina <lumina@example.com>  Tue, 15 Sep 2026 17:20:00 +0800
+
+lumina-lock (0.4.6-1) unstable; urgency=medium
+
+  * Date animation no longer steps. QFont::setPixelSize takes an int, so
+    animating font.pixelSize made the 22px date snap through four visible sizes
+    across the transition while the 125px clock took forty-five and read as
+    continuous — measured, the date's width moved in three 11px jumps where the
+    clock's took seven finer ones. GlassText now animates a continuous `size`,
+    rasterises the glyphs at the nearest integer size and applies a sub-pixel
+    scale correction, so the motion interpolates smoothly and the glyphs stay
+    crisp. Side effect: the date now renders at its designed 27*unit instead of
+    being truncated to 22px, so it is ~1px larger in the idle state.
+  * Entry no longer stutters. The full-screen blur was pre-warmed by drawing it
+    for the first 12 rendered frames; because the blur chain runs even at amount
+    0, that cost a full-screen multi-level blur per frame and the entry
+    animation lost frames (a plateau mid-fade, measured). It is now warmed once,
+    after the entry has settled, where the cost is invisible.
+  * Settings page rewritten to the control-center conventions: every row carries
+    backgroundType: DccObject.Normal, values moved into the row description, DTK
+    flat combo boxes and a section title above the clock rows. Row heights,
+    button sizes and paddings are left at the control center's defaults rather
+    than overridden per item.
+  * File pickers now open the *system* file dialog instead of the Qt Quick
+    built-in one (DontUseNativeDialog is gone), matching every other
+    control-center plugin.
+  * The unlock hint fades and rises into place, then breathes.
+  * A printable key that wakes the lock now becomes the first character of the
+    password instead of being swallowed.
+  * Password field: the dots are centred, each new character gives a short pop,
+    a wrong password bounces (decaying sideways shake plus a springy dip rather
+    than a flat slide) and a correct one flashes the accent colour and pulses
+    outward before the scene fades.
+
+ -- Lumina <lumina@example.com>  Tue, 15 Sep 2026 15:00:00 +0800
+
 lumina-lock (0.4.5-1) unstable; urgency=medium
 
   * Fix the frozen start of the first Idle -> Authenticating transition in a

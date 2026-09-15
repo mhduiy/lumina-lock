@@ -25,9 +25,11 @@ Item {
     opacity: reveal
     scale: 0.96 + 0.04 * reveal
     transform: Translate { y: (1 - reveal) * (26 * unit) }
-    Behavior on reveal {
-        NumberAnimation { duration: Theme.motionDuration; easing.type: Easing.OutCubic }
-    }
+
+    // No Behavior here on purpose: `reveal` is already animated by the scene
+    // (content.authReveal), and smoothing it a second time made this panel lag
+    // a whole extra duration behind the clock — visibly out of sync when the
+    // password field appears and when Escape returns to the idle state.
 
     width: 340 * unit
     height: column.height
@@ -107,9 +109,7 @@ Item {
             font.family: Theme.fontFamily
             font.pixelSize: 14 * auth.unit
             opacity: auth.errorText !== "" ? 1 : 0
-            Behavior on opacity {
-                NumberAnimation { duration: 180 }
-            }
+            MotionBehavior on opacity { duration: 180 }
         }
     }
 
@@ -122,23 +122,19 @@ Item {
         field.text = ""
     }
 
-    function focusField() {
+    function focusField(initialText) {
         field.focusField()
+        // A printable key that woke the lock starts the password.
+        field.appendText(initialText)
     }
 
     function clearAndShake() {
         field.text = ""
-        shake.restart()
+        field.bounceError()
         field.focusField()
     }
 
-    SequentialAnimation {
-        id: shake
-        property real d: 8 * auth.unit
-        NumberAnimation { target: field; property: "x"; to: -shake.d; duration: 45 }
-        NumberAnimation { target: field; property: "x"; to:  shake.d; duration: 45 }
-        NumberAnimation { target: field; property: "x"; to: -shake.d * 0.6; duration: 45 }
-        NumberAnimation { target: field; property: "x"; to:  shake.d * 0.6; duration: 45 }
-        NumberAnimation { target: field; property: "x"; to: 0; duration: 45 }
+    function playSuccess() {
+        field.playSuccess()
     }
 }

@@ -12,8 +12,16 @@ import Lumina 1.0
 // flat colour, and a soft glyph-shaped shadow keeps it separable from a
 // wallpaper of any brightness.
 //
+// Size is driven by `size` rather than by `font.pixelSize` because
+// QFont::setPixelSize takes an *int*: animating the font size directly makes
+// small type snap through a handful of sizes. Measured across the
+// Idle -> Authenticating transition, a 22 px date took four visible steps
+// (visibly stuttering) while the 125 px clock took forty-five (smooth). So the
+// glyphs are rasterised at the nearest integer size — keeping them crisp — and
+// a sub-pixel scale correction makes the on-screen size continuous.
+//
 // The font is spelled out as scalar properties rather than aliased to the
-// child Text, so callers can put a Behavior on `pixelSize` and animate the type
+// child Text, so callers can put a Behavior on `size` and animate the type
 // (an alias to a grouped property cannot be animated).
 //
 // `sourceOriginBase` is the top-left of this item's *parent* coordinate system
@@ -26,7 +34,8 @@ Item {
     property string text
     property string fontFamily: Theme.fontFamily
     property int fontWeight: Font.Normal
-    property real pixelSize: 16
+    // Continuous on-screen size, in device pixels. Animate this.
+    property real size: 16
     property real letterSpacing: 0
 
     property Item background: null
@@ -60,140 +69,163 @@ Item {
     readonly property bool sampling: effectsAvailable
                                      && background !== null
                                      && width > 0 && height > 0
+    // Shown only when the glass genuinely cannot be rendered. It must NOT key
+    // off `sampling`: that is also false for the first frame or two before the
+    // item has been laid out, and the opaque white fallback then flashed over
+    // the wallpaper before the glass replaced it.
+    readonly property bool fallbackVisible: !effectsAvailable || background === null
 
     readonly property point sourceOrigin:
         Qt.point(sourceOriginBase.x + x, sourceOriginBase.y + y)
 
-    implicitWidth: glyphs.implicitWidth
-    implicitHeight: glyphs.implicitHeight
+    // Nearest size the glyphs are actually rasterised at, plus the leftover
+    // factor that keeps the on-screen size continuous between those steps.
+    readonly property int rasterSize: Math.max(1, Math.round(size))
+    readonly property real sizeCorrection: size / rasterSize
 
-    // Glyph mask; only ever sampled as a mask, never drawn by itself.
-    //
-    // The blur lives *inside* the mask layer rather than in `layer.effect`:
-    // a layer effect is applied while nesting the layer into the scene, and
-    // this item is never drawn, so a `layer.effect` here would silently do
-    // nothing (measured: identical pixels with and without it).
+    implicitWidth: host.width * sizeCorrection
+    implicitHeight: host.height * sizeCorrection
+
+    // Everything is laid out at the rasterised size and then scaled by the
+    // sub-pixel correction, so the layout follows the continuous size while the
+    // glyphs stay crisp.
     Item {
-        id: glyphMask
-        anchors.fill: parent
-        visible: false
-        layer.enabled: true
-        layer.smooth: true
+        id: host
+        width: glyphs.implicitWidth
+        height: glyphs.implicitHeight
+        scale: root.sizeCorrection
+        transformOrigin: Item.TopLeft
 
-        Text {
-            id: glyphs
+        // Glyph mask; only ever sampled as a mask, never drawn by itself.
+        //
+        // The blur lives *inside* the mask layer rather than in `layer.effect`:
+        // a layer effect is applied while nesting the layer into the scene, and
+        // this item is never drawn, so a `layer.effect` here would silently do
+        // nothing (measured: identical pixels with and without it).
+        Item {
+            id: glyphMask
             anchors.fill: parent
-            text: root.text
-            font.family: root.fontFamily
-            font.weight: root.fontWeight
-            font.pixelSize: root.pixelSize
-            font.letterSpacing: root.letterSpacing
-            color: "white"
             visible: false
             layer.enabled: true
+            layer.smooth: true
+
+            Text {
+                id: glyphs
+                anchors.fill: parent
+                text: root.text
+                font.family: root.fontFamily
+                font.weight: root.fontWeight
+                font.pixelSize: root.rasterSize
+                font.letterSpacing: root.letterSpacing
+                color: "white"
+                visible: false
+                layer.enabled: true
+            }
+
+            MultiEffect {
+                anchors.fill: parent
+                source: glyphs
+                blurEnabled: true
+                blur: root.maskSoftness
+                // blurMax <= 16 keeps the blur at level 1 (one downsample). At
+                // blurMax 32 the blur runs at quarter resolution, which
+                // quantises the amount into coarse steps - 0.08 and 0.16
+                // rendered identically.
+                blurMax: 16
+                autoPaddingEnabled: false
+            }
         }
 
-        MultiEffect {
+        // Soft shadow shaped like the glyphs. Without it the glass type
+        // disappears over a wallpaper whose brightness matches the glass lift.
+        Item {
+            id: shadow
             anchors.fill: parent
-            source: glyphs
-            blurEnabled: true
-            blur: root.maskSoftness
-            // blurMax <= 16 keeps the blur at level 1 (one downsample). At
-            // blurMax 32 the blur runs at quarter resolution, which quantises
-            // the amount into coarse steps - 0.08 and 0.16 rendered
-            // identically.
-            blurMax: 16
-            autoPaddingEnabled: false
-        }
-    }
+            visible: root.sampling
+            opacity: root.shadowOpacity
+            layer.enabled: true
+            layer.smooth: true
+            layer.effect: MultiEffect {
+                blurEnabled: true
+                blur: 0.22
+                blurMax: 32
+                autoPaddingEnabled: false
+            }
 
-    // Soft shadow shaped like the glyphs. Without it the glass type disappears
-    // over a wallpaper whose brightness matches the glass lift.
-    Item {
-        id: shadow
-        anchors.fill: parent
-        visible: root.sampling
-        opacity: root.shadowOpacity
-        layer.enabled: true
-        layer.smooth: true
-        layer.effect: MultiEffect {
-            blurEnabled: true
-            blur: 0.22
-            blurMax: 32
-            autoPaddingEnabled: false
+            Text {
+                anchors.fill: parent
+                text: root.text
+                font.family: root.fontFamily
+                font.weight: root.fontWeight
+                font.pixelSize: root.rasterSize
+                font.letterSpacing: root.letterSpacing
+                color: "#000000"
+            }
         }
 
+        // Sampled + blurred wallpaper, clipped to the glyphs. The layer is what
+        // stops the square sample from being drawn as a bright rectangle:
+        // without it the unblurred region would show through wherever the scene
+        // above the wallpaper (the dim layer during authentication) is not
+        // itself opaque.
+        Item {
+            id: glass
+            anchors.fill: parent
+            visible: root.sampling
+            opacity: root.glassOpacity
+            layer.enabled: true
+            layer.smooth: true
+            layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: glyphMask
+                // The mask already carries a soft, spatially wide ramp; a wider
+                // threshold ramp here would only wash the strokes out.
+                maskThresholdMin: 0.5
+                maskSpreadAtMin: 1.0
+            }
+
+            ShaderEffectSource {
+                id: sample
+                anchors.fill: parent
+                sourceItem: root.background
+                sourceRect: Qt.rect(root.sourceOrigin.x, root.sourceOrigin.y,
+                                    root.width, root.height)
+                live: root.liveSource
+                smooth: true
+                onSourceRectChanged: scheduleUpdate()
+                Component.onCompleted: scheduleUpdate()
+            }
+
+            MultiEffect {
+                anchors.fill: parent
+                source: sample
+                blurEnabled: true
+                blur: root.blurAmount
+                blurMax: 32
+                autoPaddingEnabled: false
+                brightness: root.brighten
+                colorization: root.tintAmount
+                colorizationColor: root.tint
+            }
+        }
+
+        // Readable fallback when the glass cannot be rendered.
         Text {
             anchors.fill: parent
+            visible: root.fallbackVisible
             text: root.text
             font.family: root.fontFamily
             font.weight: root.fontWeight
-            font.pixelSize: root.pixelSize
+            font.pixelSize: root.rasterSize
             font.letterSpacing: root.letterSpacing
-            color: "#000000"
+            color: Theme.textPrimary
         }
-    }
-
-    // Sampled + blurred wallpaper, clipped to the glyphs. The layer is what
-    // stops the square sample from being drawn as a bright rectangle: without
-    // it the unblurred region would show through wherever the scene above the
-    // wallpaper (the dim layer during authentication) is not itself opaque.
-    Item {
-        id: glass
-        anchors.fill: parent
-        visible: root.sampling
-        opacity: root.glassOpacity
-        layer.enabled: true
-        layer.smooth: true
-        layer.effect: MultiEffect {
-            maskEnabled: true
-            maskSource: glyphMask
-            // The mask already carries a soft, spatially wide ramp; a wider
-            // threshold ramp here would only wash the strokes out.
-            maskThresholdMin: 0.5
-            maskSpreadAtMin: 1.0
-        }
-
-        ShaderEffectSource {
-            id: sample
-            anchors.fill: parent
-            sourceItem: root.background
-            sourceRect: Qt.rect(root.sourceOrigin.x, root.sourceOrigin.y,
-                                root.width, root.height)
-            live: root.liveSource
-            smooth: true
-            onSourceRectChanged: scheduleUpdate()
-            Component.onCompleted: scheduleUpdate()
-        }
-
-        MultiEffect {
-            anchors.fill: parent
-            source: sample
-            blurEnabled: true
-            blur: root.blurAmount
-            blurMax: 32
-            autoPaddingEnabled: false
-            brightness: root.brighten
-            colorization: root.tintAmount
-            colorizationColor: root.tint
-        }
-    }
-
-    // Readable fallback when the glass cannot be rendered.
-    Text {
-        anchors.fill: parent
-        visible: !root.sampling
-        text: root.text
-        font.family: root.fontFamily
-        font.weight: root.fontWeight
-        font.pixelSize: root.pixelSize
-        font.letterSpacing: root.letterSpacing
-        color: Theme.textPrimary
     }
 
     Connections {
         target: root
         function onRefreshTokenChanged() { sample.scheduleUpdate() }
         function onSamplingChanged() { if (root.sampling) sample.scheduleUpdate() }
+        function onRasterSizeChanged() { sample.scheduleUpdate() }
     }
 }

@@ -5,10 +5,29 @@
 #include <QHash>
 #include <QSet>
 
+#include <algorithm>
+
 namespace {
 const QString kAppId = QStringLiteral("org.lumina.lock");
 const QString kClockWeightKey = QStringLiteral("clockWeight");
 const QString kDateWeightKey = QStringLiteral("dateWeight");
+const QString kClockSizeKey = QStringLiteral("clockFontSize");
+const QString kDateSizeKey = QStringLiteral("dateFontSize");
+
+// Reference pixels at a 1080px-tall screen. Bounds are enforced here rather
+// than trusted from the config: a hand-edited value must not be able to shrink
+// the clock into illegibility or push the date off the screen.
+constexpr int kClockSizeDefault = 150;
+constexpr int kClockSizeMin = 80;
+constexpr int kClockSizeMax = 240;
+constexpr int kDateSizeDefault = 27;
+constexpr int kDateSizeMin = 14;
+constexpr int kDateSizeMax = 48;
+
+int clamped(int value, int lo, int hi)
+{
+    return std::max(lo, std::min(hi, value));
+}
 
 // DConfig keeps these human-readable for the control center; QML wants the
 // numeric QFont::Weight. An unknown name falls back rather than throwing, so a
@@ -49,17 +68,26 @@ void AppearanceConfig::reload()
                                      QFont::Light);
     const int date = weightFromName(m_config->value(kDateWeightKey).toString(),
                                     QFont::Medium);
-    if (clock == m_clockWeight && date == m_dateWeight)
+    const int clockSize = clamped(m_config->value(kClockSizeKey, kClockSizeDefault).toInt(),
+                                  kClockSizeMin, kClockSizeMax);
+    const int dateSize = clamped(m_config->value(kDateSizeKey, kDateSizeDefault).toInt(),
+                                 kDateSizeMin, kDateSizeMax);
+    if (clock == m_clockWeight && date == m_dateWeight
+        && clockSize == m_clockFontSize && dateSize == m_dateFontSize)
         return;
 
     m_clockWeight = clock;
     m_dateWeight = date;
+    m_clockFontSize = clockSize;
+    m_dateFontSize = dateSize;
     emit changed();
 }
 
 void AppearanceConfig::onValueChanged(const QString &key)
 {
-    static const QSet<QString> watched{kClockWeightKey, kDateWeightKey};
+    static const QSet<QString> watched{
+        kClockWeightKey, kDateWeightKey, kClockSizeKey, kDateSizeKey,
+    };
     if (watched.contains(key))
         reload();
 }

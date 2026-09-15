@@ -8,14 +8,16 @@
 
 - 极简展示界面：壁纸 + 大号时间 + 日期，无控制中心 / 通知 / 天气等无关内容
 - **磨砂玻璃质感**：时间 / 日期本身是半透明玻璃字——字形作为遮罩，笔画里透出模糊后的壁纸（iOS 锁屏那种观感），并带一层字形投影保证任意壁纸下都可读；密码框则是圆角毛玻璃面板。两者都只采样自身覆盖的那一小块壁纸并裁剪成对应形状，不做整屏模糊；静态壁纸按需采样（静止时不重算），视频壁纸逐帧采样
-- 任意按键 / 点击 / 上滑进入认证态，时间上移、背景 dim + 适度模糊、密码区 fade + slide 出现
+- 任意按键 / 点击 / 上滑进入认证态，时间上移、背景 dim + 适度模糊、密码区 fade + slide 出现；**唤醒的那次按键会直接成为密码的第一个字符**，底部提示文字淡入上浮后缓慢呼吸
+- 密码框：圆点居中显示，每输入一个字符有一次轻微弹动；密码错误时横向抖动 + 弹性下沉的弹跳反馈，正确时描边闪 accent 色并向外脉冲一下
 - 静态图片壁纸（`Image`，aspect-crop 填充）与视频动态壁纸（`MediaPlayer` + `VideoOutput`，循环、静音）
-- 视频带 poster 占位，进入时无黑屏闪烁；锁屏退出后释放视频资源
+- 壁纸整摞采用「**淡出上层遮挡物**」揭示：底色层在最上面盖住整摞，就绪后交叉淡出（500ms），poster 同理盖在视频之上。不用「淡入内容」是因为 `VideoOutput` 的 item opacity 不参与混合，而 `Rectangle`/`Image` 的会。进入时无黑屏闪烁；锁屏退出后释放视频资源
 - **时间 / 日期字体粗细可调**（细体 / 常规 / 中等 / 半粗 / 粗体），控制中心里改完即时生效
 - **控制中心集成**：随包附带 dde-control-center 插件（顶级模块「锁屏壁纸」），可设置静态图片 / 动态视频壁纸及封面、时间与日期字重，写入 `org.lumina.lock` DConfig；锁屏启动时读取、驻留时实时生效（CLI `--wallpaper`/`--video` 优先）
 - PAM 密码认证（C++ 层、异步、密码不落日志、生命周期尽量短）
 - 认证失败内联错误提示 + 密码框轻微 shake；成功则播放退出动画后解锁
-- **转场**：退出时淡出内容、再淡出窗口；不做内容缩放（缩放整屏大号文字是此前卡顿的主因），视频壁纸全程继续播放。全屏壁纸模糊在启动的头几帧预热（以 0 模糊量绘制一次），避免它第一次渲染时编译 level-3 模糊 shader、分配多级 FBO 链而卡住过渡
+- **入场**：时钟/日期以固定字号单次淡入（480ms），不做尺寸动画；**再次上锁时同样只淡入一次**（`resetForLock()` 关闭 `animating` 让场景吸附回 Idle，入场淡入必须同样受它约束，否则会把上次遗留的满不透明度先淡出再淡入）——`unit` 取自窗口高度，窗口定尺寸前为 0，若此时动画尺寸会呈现"从无到有地长大"
+- **转场**：退出时淡出内容、再淡出窗口；不做内容缩放（缩放整屏大号文字是此前卡顿的主因），视频壁纸全程继续播放。所有淡入淡出共用 `qml/components/MotionBehavior.qml`（一条 `cubic-bezier(0.4, 0, 0.2, 1)`，时长按用途覆盖），避免各处曲线漂移。全屏壁纸模糊在启动的头几帧预热（以 0 模糊量绘制一次），避免它第一次渲染时编译 level-3 模糊 shader、分配多级 FBO 链而卡住过渡
 - **上锁期间独占输入**（X11）：锁屏时抓取键盘与指针，Alt+Tab / Super 等窗口管理器快捷键不再切走窗口；解锁时释放
 - **常驻进程**：解锁只隐藏窗口、释放视频资源，进程不退出；可通过 D-Bus 重新上锁
 - **dde-lock D-Bus 兼容**：以 `org.deepin.dde.LockFront1` 注册 `Show / ShowUserList / ShowAuth / Suspend / Hibernate` 方法与 `Visible` 属性，DDE 组件（dde-daemon、dock、快捷键、挂起/恢复）调用方式与 dde-lock 完全一致
@@ -109,17 +111,18 @@ QML AuthView.submit(password)
 
 ## 在控制中心设置锁屏
 
-随包安装一个 dde-control-center 插件，控制中心会多出一个顶级模块「锁屏壁纸」，可设置：
+随包安装一个 dde-control-center 插件，控制中心会多出一个顶级模块「锁屏壁纸」。页面按控制中心自己的约定写：每行 `backgroundType: DccObject.Normal`、值放在行描述里、下拉用 `D.ComboBox { flat: true }`；行高、按钮尺寸与内边距**全部沿用控制中心默认值**，插件里不做任何写死，因此和其他设置页保持一致。可设置：
 
 - **壁纸类型**：默认壁纸 / 静态图片 / 动态视频
 - **静态图片**：文件选择器选择一张图片
 - **动态视频**：选择一段视频；**视频封面**：可选一张封面图（避免首帧黑屏）
+- **时间字号** / **日期字号**：以 1080p 高度为基准的像素值（时间 80–240、日期 14–48），按屏幕分辨率等比缩放
 - **时间字体粗细** / **日期字体粗细**：细体 / 常规 / 中等 / 半粗 / 粗体
 - **恢复默认**：清空配置，回到内置壁纸与默认字重
 
-插件写入 `org.lumina.lock` DConfig（键 `wallpaperType` / `wallpaperPath` / `videoPath` / `posterPath` / `clockWeight` / `dateWeight`，schema 随包装在 `/usr/share/dsg/configs/org.lumina.lock/`）。锁屏进程读取同一份配置：启动时应用，驻留期间实时生效（DConfig 变更通知），因此**在控制中心改完即可直接上锁验证**。字重取值为 `thin` / `extralight` / `light` / `normal` / `medium` / `demibold` / `bold`，无法识别的值回退到默认（时间 `light`、日期 `medium`），因此手改配置不会导致锁屏异常。
+插件写入 `org.lumina.lock` DConfig（键 `wallpaperType` / `wallpaperPath` / `videoPath` / `posterPath` / `clockWeight` / `dateWeight` / `clockFontSize` / `dateFontSize`，schema 随包装在 `/usr/share/dsg/configs/org.lumina.lock/`）。锁屏进程读取同一份配置：启动时应用，驻留期间实时生效（DConfig 变更通知），因此**在控制中心改完即可直接上锁验证**。字重取值为 `thin` / `extralight` / `light` / `normal` / `medium` / `demibold` / `bold`，无法识别的值回退到默认（时间 `light`、日期 `medium`）；字号超出范围会被夹到边界（时间 80–240、日期 14–48）。因此手改配置不会导致锁屏异常。
 
-命令行参数 `--wallpaper` / `--video` 优先级高于 DConfig；不带这些参数时才读取控制中心的设置。也可用 CLI 直接读写该配置：
+命令行参数 `--wallpaper` / `--video` 优先级高于 DConfig；不带这些参数时才读取控制中心的设置。文件选择用**系统文件对话框**（`FileDialog` 不加 `DontUseNativeDialog`，与其余控制中心插件一致，由文件管理器提供界面），系统上没有该服务时 Qt 会自动回退到自带实现。也可用 CLI 直接读写该配置：
 
 ```bash
 dde-dconfig set -a org.lumina.lock -r org.lumina.lock -k wallpaperType -v video
@@ -127,6 +130,8 @@ dde-dconfig set -a org.lumina.lock -r org.lumina.lock -k videoPath -v /path/to/w
 dde-dconfig set -a org.lumina.lock -r org.lumina.lock -k posterPath -v /path/to/cover.jpg
 dde-dconfig set -a org.lumina.lock -r org.lumina.lock -k clockWeight -v bold
 dde-dconfig set -a org.lumina.lock -r org.lumina.lock -k dateWeight -v demibold
+dde-dconfig set -a org.lumina.lock -r org.lumina.lock -k clockFontSize -v 180
+dde-dconfig set -a org.lumina.lock -r org.lumina.lock -k dateFontSize -v 32
 ```
 
 开发期调试插件（未安装到系统时）：
@@ -160,14 +165,14 @@ dde-lock 并不是独立包：可执行文件、D-Bus service 文件、PAM 配�
 ```bash
 # 需安装构建依赖：qt6-base-dev qt6-declarative-dev qt6-multimedia-dev libpam0g-dev libxcb1-dev \
 #   libdtkcore-dev dde-control-center-dev debhelper cmake
-dpkg-buildpackage -b -us -uc     # 产物在上级目录 lumina-lock_0.4.5-1_amd64.deb
+dpkg-buildpackage -b -us -uc     # 产物在上级目录 lumina-lock_0.4.11-1_amd64.deb
 ```
 
 ### 安装 / 卸载 / 回退
 
 ```bash
 # 安装（替换 dde-lock）
-sudo dpkg -i lumina-lock_0.4.5-1_amd64.deb
+sudo dpkg -i lumina-lock_0.4.11-1_amd64.deb
 systemctl --user daemon-reload
 systemctl --user restart dde-lock.service   # 让新锁屏接管；或直接重新登录
 

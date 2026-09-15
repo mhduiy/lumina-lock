@@ -24,10 +24,24 @@ QtObject {
 
     readonly property string fontFamily: "Noto Sans"
 
-    // One duration for every state transition, so the clock, the auth panel and
-    // the scene dimming move as a single gesture instead of three overlapping
-    // animations that finish at different times.
+    // One duration and one curve for every state transition, so the clock, the
+    // auth panel and the scene dimming move as a single gesture instead of
+    // three overlapping animations that finish at different times.
+    //
+    // The curve is a standard ease-in-out, cubic-bezier(0.4, 0, 0.2, 1), picked
+    // over the Easing.OutCubic it replaces: OutCubic spends ~58% of the motion
+    // in the first quarter of the time, which reads as "jump, then creep" when
+    // a large element both moves and resizes. This one leaves gently, carries
+    // the motion through the middle and lands softly, and it never overshoots —
+    // an overshoot would be wrong for the dim and blur that run alongside.
     readonly property int motionDuration: 320
+    // The curve in the six-number form QML's easing value type expects: the
+    // three control points of one cubic segment, the last pair being the end
+    // point. This is cubic-bezier(0.4, 0, 0.2, 1).
+    //
+    // Note it is set via `easing.bezierCurve` and *not* `easing.type`: the type
+    // setter builds a fresh QEasingCurve and would discard the control points.
+    readonly property var motionCurve: [0.4, 0.0, 0.2, 1.0, 1.0, 1.0]
 
     // Scales a design value (authored against a 1080px-tall reference) to the
     // given window height. Avoids hard-coded pixel sizes across resolutions

@@ -25,6 +25,8 @@ class Luminalock : public QObject
     Q_PROPERTY(QString posterPath READ posterPath NOTIFY posterPathChanged)
     Q_PROPERTY(QString clockWeight READ clockWeight NOTIFY clockWeightChanged)
     Q_PROPERTY(QString dateWeight READ dateWeight NOTIFY dateWeightChanged)
+    Q_PROPERTY(int clockFontSize READ clockFontSize NOTIFY clockFontSizeChanged)
+    Q_PROPERTY(int dateFontSize READ dateFontSize NOTIFY dateFontSizeChanged)
 
 public:
     explicit Luminalock(QObject *parent = nullptr);
@@ -35,11 +37,15 @@ public:
     QString posterPath() const { return m_posterPath; }
     QString clockWeight() const { return m_clockWeight; }
     QString dateWeight() const { return m_dateWeight; }
+    int clockFontSize() const { return m_clockFontSize; }
+    int dateFontSize() const { return m_dateFontSize; }
 
     Q_INVOKABLE void setType(const QString &type);
     Q_INVOKABLE bool setFile(const QString &kind, const QUrl &url);
     Q_INVOKABLE void setClockWeight(const QString &weight);
     Q_INVOKABLE void setDateWeight(const QString &weight);
+    Q_INVOKABLE void setClockFontSize(int size);
+    Q_INVOKABLE void setDateFontSize(int size);
     Q_INVOKABLE void resetToDefault();
 
 Q_SIGNALS:
@@ -49,6 +55,8 @@ Q_SIGNALS:
     void posterPathChanged(const QString &path);
     void clockWeightChanged(const QString &weight);
     void dateWeightChanged(const QString &weight);
+    void clockFontSizeChanged(int size);
+    void dateFontSizeChanged(int size);
 
 private:
     void reload();
@@ -61,6 +69,8 @@ private:
     QString m_posterPath;
     QString m_clockWeight;
     QString m_dateWeight;
+    int m_clockFontSize = 150;
+    int m_dateFontSize = 27;
 };
 
 #endif // LUMINALOCK_H

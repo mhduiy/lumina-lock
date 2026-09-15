@@ -61,6 +61,26 @@
             "description": "锁屏日期字体的粗细：thin / extralight / light / normal / medium / demibold / bold。",
             "permissions": "readwrite",
             "visibility": "private"
+        },
+        "clockFontSize": {
+            "value": 150,
+            "serial": 0,
+            "flags": [],
+            "name": "Clock font size",
+            "name[zh_CN]": "时间字号",
+            "description": "锁屏时间字号，按 1080p 高度下的像素值给出（实际按屏幕分辨率等比缩放）。允许 80-240，默认 150。",
+            "permissions": "readwrite",
+            "visibility": "private"
+        },
+        "dateFontSize": {
+            "value": 27,
+            "serial": 0,
+            "flags": [],
+            "name": "Date font size",
+            "name[zh_CN]": "日期字号",
+            "description": "锁屏日期字号，按 1080p 高度下的像素值给出（实际按屏幕分辨率等比缩放）。允许 14-48，默认 27。",
+            "permissions": "readwrite",
+            "visibility": "private"
         }
     }
 }
