@@ -2,7 +2,6 @@
     <qresource prefix="/">
         <file>qml/Theme.qml</file>
         <file>qml/LockScreen.qml</file>
-        <file>qml/SecondaryScreen.qml</file>
         <file>qml/ClockView.qml</file>
         <file>qml/AuthView.qml</file>
         <file>qml/WallpaperHost.qml</file>
