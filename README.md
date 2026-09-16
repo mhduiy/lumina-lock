@@ -18,12 +18,12 @@
 - 认证失败内联错误提示 + 密码框轻微 shake；成功则播放退出动画后解锁
 - **入场**：时钟/日期以固定字号单次淡入（480ms），不做尺寸动画；**再次上锁时同样只淡入一次**（`resetForLock()` 关闭 `animating` 让场景吸附回 Idle，入场淡入必须同样受它约束，否则会把上次遗留的满不透明度先淡出再淡入）——`unit` 取自窗口高度，窗口定尺寸前为 0，若此时动画尺寸会呈现"从无到有地长大"
 - **转场**：退出时淡出内容、再淡出窗口；不做内容缩放（缩放整屏大号文字是此前卡顿的主因），视频壁纸全程继续播放。所有淡入淡出共用 `qml/components/MotionBehavior.qml`（一条 `cubic-bezier(0.4, 0, 0.2, 1)`，时长按用途覆盖），避免各处曲线漂移。全屏壁纸模糊在启动的头几帧预热（以 0 模糊量绘制一次），避免它第一次渲染时编译 level-3 模糊 shader、分配多级 FBO 链而卡住过渡
-- **上锁期间独占输入**（X11）：锁屏时抓取键盘与指针，Alt+Tab / Super 等窗口管理器快捷键不再切走窗口；解锁时释放
+- **上锁期间独占输入**（X11）：锁屏时抓取键盘，Alt+Tab / Super 等窗口管理器快捷键不再切走窗口；解锁时释放。抓取只挂在「当前认证屏」的窗口上并随认证 UI 迁移（**不抓取指针**：多屏下每个屏都有自己的全屏窗口，抓指针会把所有点击都灌进一个窗口，导致"点哪块屏哪块屏进认证"失效）
 - **常驻进程**：解锁只隐藏窗口、释放视频资源，进程不退出；可通过 D-Bus 重新上锁
 - **dde-lock D-Bus 兼容**：以 `org.deepin.dde.LockFront1` 注册 `Show / ShowUserList / ShowAuth / Suspend / Hibernate` 方法与 `Visible` 属性，DDE 组件（dde-daemon、dock、快捷键、挂起/恢复）调用方式与 dde-lock 完全一致
 - **X11 窗口集成**：锁屏窗口带 `_DEEPIN_LOCK_SCREEN` / `_DEEPIN_NET_STARTUP` 属性、使用 dde-lock 相同的窗口标志，deepin-wm 会将其置顶并保持聚焦
 - 挂起恢复时遵循电源守护进程的 `SleepLock` 设置（关闭时恢复桌面不锁屏）
-- 基础多屏：主屏显示认证 UI，副屏只显示壁纸 + 时钟，且副屏不重复启动视频解码
+- **多屏**：每个屏跑同一个 surface，同一时刻只有一块屏是「活跃屏」——它收起时钟并显示密码框，其余屏保持壁纸 + 时钟 + 提示。活跃屏跟随交互：**点击**哪块屏就归哪块屏；**按键**归「指针所在」的那块屏（X11 键盘抓取只会把按键送到一个窗口，指针位置是唯一可靠的"用户在看哪块屏"信号），唤醒的那次按键会成为该屏密码的第一个字符。副屏同样播放动态壁纸（每屏一个解码器，锁屏隐藏时释放）
 - HiDPI 友好：所有尺寸基于窗口高度等比缩放，无 1920×1080 写死
 
 ## 构建
@@ -68,7 +68,7 @@ src/
 ├── wallpaper/WallpaperManager  # 壁纸“是什么”（类型 + 源），不含渲染
 ├── wallpaper/WallpaperConfig   # 从 org.lumina.lock DConfig 读取壁纸设置并应用
 ├── appearance/AppearanceConfig # 从同一 DConfig 读取时间 / 日期字重
-├── screen/ScreenManager    # 每屏一个全屏窗口、X11 锁屏属性与输入抓取、热插拔
+├── screen/ScreenManager    # 每屏一个全屏窗口、活跃认证屏的选择、X11 锁屏属性与键盘抓取、热插拔
 └── main.cpp                # 组装 + CLI + D-Bus 服务注册
 
 dcc-plugin/                 # dde-control-center 插件（控制中心「锁屏壁纸」模块）
@@ -76,8 +76,7 @@ dcc-plugin/                 # dde-control-center 插件（控制中心「锁屏�
 └── qml/Luminalock*.qml     # 模块入口 + 设置页
 
 qml/
-├── LockScreen.qml          # 主屏统一 Scene（Idle / Authenticating 状态）
-├── SecondaryScreen.qml     # 副屏（壁纸 + 时钟）
+├── LockScreen.qml          # 统一 Scene（Idle / Authenticating 状态；每个屏各一个实例）
 ├── ClockView.qml           # 时间 / 日期（磨砂玻璃字 + 可调字重）
 ├── AuthView.qml            # 头像 / 用户名 / 密码 / 内联错误
 ├── WallpaperHost.qml       # 壁纸渲染（静态 / 视频）
@@ -232,9 +231,23 @@ D-Bus 命名（`org.deepin.dde.*1` snipe 世代 vs 旧版 `com.deepin.dde.*`）�
 
 代码不依赖任一窗口系统特有的 UI 逻辑，仅使用 `QScreen` + `showFullScreen()`。在 X11 下窗口附加 `_DEEPIN_LOCK_SCREEN` / `_DEEPIN_NET_STARTUP` 属性并使用 `WindowStaysOnTopHint | X11BypassWindowManagerHint`（与 dde-lock 一致），由 deepin-wm 置顶并聚焦；Wayland 下可作为普通全屏窗口运行（安全语义不同，见上），且 dde-lock 替换路径在 Wayland 会话不生效（与 dde-lock 现状一致）。
 
-**输入独占只在 X11 生效**：上锁时对主屏窗口做键盘 / 指针抓取（`QWindow::setKeyboardGrabEnabled` / `setMouseGrabEnabled`），窗口管理器收不到 Alt+Tab、Super 等快捷键，因此无法切走锁屏；解锁时释放。命令行的 `--list` 之外的 X11 路径若抓取失败会打印 `ScreenManager: input grab refused` 警告。Wayland 下这两次调用返回 `false`（合成器掌管快捷键），不做替代方案——锁屏窗口与普通全屏窗口语义相同。
+**输入独占只在 X11 生效**：上锁时对「当前认证屏」的窗口做键盘抓取（`QWindow::setKeyboardGrabEnabled`），窗口管理器收不到 Alt+Tab、Super 等快捷键，因此无法切走锁屏；解锁时释放，认证 UI 换屏时抓取跟着换到那个窗口。抓取失败会打印 `ScreenManager: keyboard grab refused` 警告（窗口还不可见时最多重试 10 次）。**不抓取指针**：多屏下每个屏都有自己的全屏窗口，点击本来就落在锁屏上，而抓指针会把所有点击灌进同一个窗口、使「点哪块屏哪块屏进认证」失效。Wayland 下键盘抓取返回 `false`（合成器掌管快捷键），不做替代方案——锁屏窗口与普通全屏窗口语义相同。
 
 **磨砂玻璃需要 shader 渲染后端**：`GlassText` / `GlassPanel` 依赖 `MultiEffect`（`ShaderEffect`）。当场景图运行在 software 后端（`QT_QUICK_BACKEND=software`、`QQuickWindow::GraphicsInfo.Software`）时无法执行 shader，此时玻璃字退化为普通白字、面板退化为半透明纯色表面，其余功能不受影响。
+
+## 多屏
+
+每个物理屏都会得到一个自己的全屏窗口，跑同一个 surface（`qml/LockScreen.qml`）。任意时刻只有一块屏是**活跃屏**：它把时钟收起、背景 dim + 模糊、显示密码框；其余屏停在 Idle（壁纸 + 时钟 + 底部提示），随时可以被唤醒接管。
+
+活跃屏由交互决定，QML 侧不参与这个判断：
+
+- **点击**：点击落在哪块屏，认证 UI 就归哪块屏（每块屏的窗口只处理自己的点击）；
+- **按键**：X11 的键盘抓取只会把按键送到「持抓取的那个窗口」，所以 `ScreenManager::eventFilter()` 全局监听按键，用**指针所在屏**作为「用户在看哪块屏」的判据——若按键不属于当前活跃屏，就把认证 UI 搬过去，并让这次按键成为该屏密码的第一个字符（不会误敲进用户看不见的那个密码框）；若按键本来就属于活跃屏，直接放行给密码框；
+- 键盘抓取跟着密码框走（抓取窗口才是收按键的窗口）；
+- **Escape** 会清掉活跃屏（所有屏回到 Idle）；D-Bus `ShowAuth(true)` 默认把认证 UI 放在主屏；
+- **热插拔**：新增屏直接建窗口、可被唤醒；活跃屏被拔掉时退回「无活跃屏」，剩下的屏随时可以接管（旧实现下主屏被拔会留下一个没有密码框、也丢了输入抓取的锁屏，只能杀进程）。
+
+`qml` 侧只通过 `Screens` 单例（`Screens.authScreenName` / `activateAuthForScreen()` / `clearAuth()` / `takePendingText()`）与这套拓扑打交道，surface 本身不含任何屏幕数/主副屏逻辑。
 
 ## 冒烟测试
 
@@ -257,6 +270,15 @@ dbus-run-session -- bash -c '
   dbus-send --session --print-reply --dest=org.lumina.Lock \
     /org/lumina/Lock org.lumina.Lock.quit
 '
+
+# 多屏（无头）：Xvfb 起两块屏，每块屏应各有一个锁屏窗口，且只有指针所在屏进认证态
+Xvfb :99 -screen 0 1920x1080x24 -screen 1 1920x1080x24 &
+DISPLAY=:99 ./build/lumina-lock --test-exit-ms 8000 &
+sleep 2
+DISPLAY=:99.0 xwininfo -root -children | grep -c "Lumina Lock"   # 期望 1
+DISPLAY=:99.1 xwininfo -root -children | grep -c "Lumina Lock"   # 期望 1
+DISPLAY=:99 xdotool mousemove 2500 500 click 1                   # 点第二块屏
+DISPLAY=:99 xdotool type --delay 80 "abc"                        # 应进入第二块屏的密码框
 
 # 真实显示环境短暂运行
 ./build/lumina-lock --test-exit-ms 3000

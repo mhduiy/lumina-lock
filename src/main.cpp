@@ -13,6 +13,7 @@
 #include <QDBusInterface>
 #include <QGuiApplication>
 #include <QQmlEngine>
+#include <QScreen>
 #include <QTimer>
 #include <QUrl>
 
@@ -123,17 +124,23 @@ int main(int argc, char *argv[])
 
     LockService lockService(&session); // dde-lock compatible adaptor (child of session)
 
+    // Created before the QML engine on purpose: the `Screens` singleton handed
+    // to the engine has to outlive it, and a stack object built first is
+    // destroyed last.
+    ScreenManager screens;
     QQmlEngine engine;
+    screens.setEngine(&engine);
 
     qmlRegisterSingletonInstance("Lumina", 1, 0, "WallpaperManager", &wallpaper);
     qmlRegisterSingletonInstance("Lumina", 1, 0, "LockSession", &session);
     qmlRegisterSingletonInstance("Lumina", 1, 0, "LockAppearance", &appearanceConfig);
+    qmlRegisterSingletonInstance("Lumina", 1, 0, "Screens", &screens);
     qmlRegisterSingletonType(QUrl(QStringLiteral("qrc:/qml/Theme.qml")),
                              "Lumina", 1, 0, "Theme");
 
-    ScreenManager screens(&engine);
-    screens.setPrimaryUrl(QUrl(QStringLiteral("qrc:/qml/LockScreen.qml")));
-    screens.setSecondaryUrl(QUrl(QStringLiteral("qrc:/qml/SecondaryScreen.qml")));
+    // Every screen runs the same surface; which one carries the password field
+    // is decided at runtime (see ScreenManager).
+    screens.setSurfaceUrl(QUrl(QStringLiteral("qrc:/qml/LockScreen.qml")));
 
     // Resident service: unlocking hides the surfaces, locking shows them again.
     QObject::connect(&session, &LockSession::lockedChanged, &app, [&screens](bool locked) {
@@ -141,6 +148,13 @@ int main(int argc, char *argv[])
             screens.showAll();
         else
             screens.hideAll();
+    });
+
+    // ShowAuth(true) comes from the session (dock, hotkey, …): the prompt
+    // belongs on the primary screen unless the user is working elsewhere.
+    QObject::connect(&session, &LockSession::showAuthRequested, &app, [&screens] {
+        if (QScreen *primary = QGuiApplication::primaryScreen())
+            screens.activateAuthForScreen(primary->name());
     });
 
     QObject::connect(&session, &LockSession::quitRequested, &app, &QCoreApplication::quit);

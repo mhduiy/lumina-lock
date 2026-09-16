@@ -19,12 +19,10 @@ import Lumina 1.0
 // the video at full opacity and dissolving what is above it gets the same
 // result through an opacity that does blend.
 //
-// `playVideo` lets secondary screens show only the poster instead of spinning
-// up a second, expensive video decoder per monitor.
+// Every screen runs this component, so a video wallpaper decodes once per
+// screen (the decoder is released while the lock is hidden, see the Loader).
 Item {
     id: root
-
-    property bool playVideo: true
 
     readonly property bool isVideo: WallpaperManager.isVideo
     readonly property bool isStatic: WallpaperManager.type === "static"
@@ -47,7 +45,7 @@ Item {
     Loader {
         id: videoLoader
         anchors.fill: parent
-        active: root.isVideo && root.playVideo && LockSession.locked
+        active: root.isVideo && LockSession.locked
         sourceComponent: videoComponent
     }
 
@@ -95,15 +93,14 @@ Item {
     }
 
     // --- Poster ---
-    // Above the video, so it masks the empty sink before the first frame, and
-    // the only content drawn when playVideo is false (secondary screens).
+    // Above the video, so it masks the empty sink before the first frame.
     //
     // `visible` follows the opacity, which keeps the item alive for the length
     // of the fade.
     Image {
         id: poster
         anchors.fill: parent
-        visible: root.isVideo && (!root.playVideo || poster.opacity > 0.001)
+        visible: root.isVideo && poster.opacity > 0.001
         source: WallpaperManager.poster
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
@@ -128,7 +125,7 @@ Item {
     }
 
     // True once the video has delivered a frame.
-    readonly property bool videoFrameReady: root.isVideo && root.playVideo
+    readonly property bool videoFrameReady: root.isVideo
                                             && videoLoader.item !== null
                                             && videoLoader.item.frameSeen
 

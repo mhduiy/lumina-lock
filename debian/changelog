@@ -1,3 +1,45 @@
+lumina-lock (0.4.12-1) unstable; urgency=medium
+
+  * Multi-screen: the authentication UI now follows the user instead of being
+    pinned to the primary screen. Every screen runs the same surface, and
+    exactly one of them is "active" at a time — it compacts the clock and
+    reveals the password field, while the others stay in Idle (wallpaper,
+    clock, hint) and can take the lock over at any moment.
+
+    Which screen that is follows the interaction, like macOS: a click gives it
+    to the screen that was clicked, and a key press gives it to the screen the
+    pointer is on. The pointer is the only usable signal for the keyboard case,
+    because the X11 grab delivers every keystroke to one window — the one
+    holding the grab — which is not necessarily where the user is looking.
+    ScreenManager therefore watches key presses application-wide: when a
+    keystroke arrives for a screen other than the active one, the interactive UI
+    moves there and the keystroke that woke it becomes the first character of
+    that screen's password, instead of being typed into a field the user cannot
+    see. The keyboard grab moves with the field, since the grab window is what
+    receives the keys.
+
+    The pointer is deliberately *not* grabbed any more. With one fullscreen
+    window per screen the clicks already land on the lock, and an X11 pointer
+    grab funnels every click into the grab window — which is exactly what would
+    stop "click the screen you are looking at" from working. Alt+Tab / Super
+    blocking is unaffected: that is the keyboard grab.
+
+    This also removes a lock-out: unplugging or disabling the primary screen
+    while locked used to destroy the only screen with a password field and
+    release the input grab, leaving a lock with nothing to type into. The
+    remaining screens can now always be woken, and when the active screen
+    disappears the choice simply falls back.
+
+  * SecondaryScreen.qml is gone: every screen runs LockScreen.qml, so a video
+    wallpaper now decodes on every screen rather than only on the primary one
+    (the decoder is still released while the lock is hidden). WallpaperHost
+    drops its `playVideo` switch, which had no caller left.
+
+  * Multi-screen smoke test in the README (Xvfb + xdotool), and the D-Bus
+    smoke test still covers the lockFront surface.
+
+ -- Lumina <lumina@example.com>  Wed, 16 Sep 2026 12:00:00 +0800
+
 lumina-lock (0.4.11-1) unstable; urgency=medium
 
   * Restored the clock's entry growth, this time on purpose. Removing the

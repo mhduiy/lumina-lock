@@ -18,6 +18,16 @@ Window {
     readonly property real u: height / 1080
     property bool unlocking: false
 
+    // Every screen runs this surface; exactly one of them carries the
+    // interactive authentication UI at a time. Which one is global state owned
+    // by ScreenManager (`Screens.authScreenName`) and is chosen by where the
+    // user interacts: a click activates the screen that was clicked, a key
+    // press activates the screen the pointer is on. All the other screens stay
+    // in Idle — wallpaper, clock, hint — and can be woken at any moment.
+    readonly property string screenName: root.screen ? root.screen.name : ""
+    readonly property bool isAuthScreen: Screens.authScreenName.length > 0
+                                         && Screens.authScreenName === root.screenName
+
     // Warm-up for the full-screen blur, performed once, after the entry
     // animation has settled. See the effect below for why it is needed and why
     // it has to happen at a moment when nothing else is animating.
@@ -55,7 +65,6 @@ Window {
     WallpaperHost {
         id: wallpaperHost
         anchors.fill: parent
-        playVideo: true
     }
 
     // Soft blur over the wallpaper while authenticating.
@@ -230,10 +239,12 @@ Window {
     }
 
     // --- Wake input (click / swipe-up) ---
+    // Only an idle screen takes clicks: on the active screen this area is
+    // disabled so the clicks reach the password field underneath it.
     MouseArea {
         id: wakeArea
         anchors.fill: parent
-        enabled: content.state === "Idle" && !root.unlocking
+        enabled: !root.isAuthScreen && !root.unlocking
         property real pressY: 0
         onPressed: (mouse) => pressY = mouse.y
         onClicked: root.wake()
@@ -244,39 +255,24 @@ Window {
     }
 
     // --- Keyboard wake ---
-    Item {
-        id: keyCatcher
-        anchors.fill: parent
-        focus: true
-        enabled: content.state === "Idle"
-        Keys.onPressed: (event) => {
-            if (content.state !== "Idle")
-                return
-            root.wake(root.printableText(event))
-            event.accepted = true
-        }
-    }
+    // There is no key handler here on purpose. The X11 grab delivers every
+    // keystroke to the one window that holds it, so the decision of *which*
+    // screen a key press belongs to is made in ScreenManager::eventFilter(),
+    // which knows where the pointer is; while this screen owns the field its
+    // own key events are simply let through to the password input.
 
     function wake(initialText) {
         if (root.unlocking)
             return
+        if (!root.isAuthScreen) {
+            // Hand the interactive UI to this screen. The resulting
+            // authScreenChanged re-enters wake() with the state settled, so
+            // there is exactly one code path that reveals the field.
+            Screens.activateAuthForScreen(root.screenName)
+            return
+        }
         content.state = "Authenticating"
         auth.focusField(initialText)
-    }
-
-    // The text a key press would have produced, or "" for anything that should
-    // not land in a password (modifiers, Return, Tab, ...).
-    function printableText(event) {
-        if (event.text.length === 0)
-            return ""
-        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
-            return ""
-        for (let i = 0; i < event.text.length; ++i) {
-            const code = event.text.charCodeAt(i)
-            if (code < 0x20 || code === 0x7f)
-                return ""
-        }
-        return event.text
     }
 
     function returnToIdle() {
@@ -284,7 +280,9 @@ Window {
             return
         auth.clearError()
         content.state = "Idle"
-        keyCatcher.forceActiveFocus()
+        // Escape drops the field everywhere, so no screen keeps showing it.
+        if (root.isAuthScreen)
+            Screens.clearAuth()
     }
 
     function submit(password) {
@@ -297,6 +295,9 @@ Window {
         if (root.unlocking)
             return
         root.unlocking = true
+        // Keystrokes from here on belong to the desktop that is about to
+        // appear, not to the lock.
+        Screens.setInteractive(false)
         unlockAnim.start()
     }
 
@@ -314,7 +315,7 @@ Window {
         content.sceneReady = false
         root.opacity = 1
         auth.reset()
-        keyCatcher.forceActiveFocus()
+        Screens.setInteractive(true)
         entryTimer.ticks = 0
         entryTimer.restart()
         content.animating = true
@@ -345,22 +346,38 @@ Window {
             if (locked)
                 root.resetForLock()
         }
-        function onShowAuthRequested() {
-            root.wake()
-        }
         function onAuthenticationFinished(success, message) {
             if (success) {
-                auth.playSuccess()
+                // Every screen plays the exit fade (the desktop has to appear
+                // on all of them); only the one holding the field shows the
+                // accepted-password feedback.
+                if (root.isAuthScreen)
+                    auth.playSuccess()
                 root.beginUnlock()
-            } else {
+            } else if (root.isAuthScreen) {
                 auth.errorText = message
                 auth.clearAndShake()
             }
         }
     }
 
+    // Which screen carries the interactive UI is global state (ScreenManager):
+    // the screen that just got it reveals the field, every other one drops back
+    // to Idle — including dropping a half-typed password it must not keep.
+    Connections {
+        target: Screens
+        function onAuthScreenChanged() {
+            if (root.isAuthScreen) {
+                if (!root.unlocking)
+                    root.wake(Screens.takePendingText())
+            } else if (!root.unlocking) {
+                auth.reset()
+                root.returnToIdle()
+            }
+        }
+    }
+
     Component.onCompleted: {
-        keyCatcher.forceActiveFocus()
         entryTimer.start()
     }
 }
