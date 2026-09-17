@@ -42,10 +42,11 @@
 #define SESSION_MGR_REQUEST_HIBERNATE QStringLiteral("RequestHibernate")
 
 // "Update and shut down" / "update and restart" are the update daemon's
-// business, not the session's: lastore takes a JSON request and brings the
-// machine down itself once the upgrade has run. Both live on the system bus.
-#define LASTORE_SERVICE   QStringLiteral("com.deepin.lastore")
-#define LASTORE_PATH      QStringLiteral("/com/deepin/lastore")
-#define LASTORE_INTERFACE QStringLiteral("com.deepin.lastore.Manager")
-#define SYS_POWER_SERVICE QStringLiteral("com.deepin.system.Power")
-#define SYS_POWER_PATH    QStringLiteral("/com/deepin/system/Power")
+// business, not the session's: lastore takes a JSON request (the upgrade mode
+// plus whether to power off) and brings the machine down itself once the upgrade
+// has run. It lives on the system bus. The 6.x generation renamed it along with
+// everything else — com.deepin.lastore does not exist there, so asking for it
+// silently answers "no update daemon" and the two rows never light up.
+#define LASTORE_SERVICE   QStringLiteral("org.deepin.dde.Lastore1")
+#define LASTORE_PATH      QStringLiteral("/org/deepin/dde/Lastore1")
+#define LASTORE_INTERFACE QStringLiteral("org.deepin.dde.Lastore1.Manager")

@@ -200,6 +200,20 @@ Item {
                 property real entrance: 0
                 MotionBehavior on entrance { duration: 320 }
 
+                // A fresh arm always counts from the start. Animating the fill's
+                // width and cancelling it with Esc left the next arm continuing
+                // from wherever the cancelled one had stopped, which reads as the
+                // countdown resuming rather than restarting.
+                onArmedChanged: {
+                    if (row.armed) {
+                        armFill.progress = 0
+                        armAnim.restart()
+                    } else {
+                        armAnim.stop()
+                        armFill.progress = 0
+                    }
+                }
+
                 Timer {
                     interval: Math.min(row.index, 7) * 45
                     running: root.shown
@@ -222,26 +236,31 @@ Item {
                     border.color: row.selected ? Theme.surfaceBorderFocus : Theme.surfaceBorder
                     Behavior on border.color { ColorAnimation { duration: 240 } }
 
-                    // The armed fill sweeps the row from the leading edge.
+                    // The armed fill sweeps the row from the leading edge. Long
+                    // and linear: this is a countdown, not a transition.
                     Rectangle {
+                        id: armFill
                         anchors.left: parent.left
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
-                        width: row.armed ? parent.width : 0
+                        width: parent.width * armFill.progress
                         radius: parent.radius
+                        opacity: armFill.progress > 0.001 ? 1 : 0
+                        property real progress: 0
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
                             GradientStop { position: 0.0; color: Qt.rgba(0.56, 0.66, 0.94, 0.30) }
                             GradientStop { position: 1.0; color: Qt.rgba(0.56, 0.66, 0.94, 0.08) }
                         }
-                        // Long, linear: this is a countdown, not a transition.
-                        Behavior on width {
-                            NumberAnimation { duration: row.armed ? root.armDuration : 140 }
-                        }
 
-                        onWidthChanged: {
-                            if (row.armed && width >= parent.width)
-                                root.activated(row.modelData.key)
+                        NumberAnimation {
+                            id: armAnim
+                            target: armFill
+                            property: "progress"
+                            from: 0
+                            to: 1
+                            duration: root.armDuration
+                            onFinished: if (row.armed) root.activated(row.modelData.key)
                         }
                     }
 

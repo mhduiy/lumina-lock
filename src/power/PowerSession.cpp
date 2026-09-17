@@ -173,7 +173,8 @@ void PowerSession::show()
     refreshAvailability();
     m_visible = true;
     qWarning().nospace() << "Power: show() done overDesktop=" << m_overDesktop
-                         << " options=" << m_options.size();
+                         << " options=" << m_options.size()
+                         << " updatesAvailable=" << m_updatesAvailable;
     Q_EMIT Visible(true);
 }
 

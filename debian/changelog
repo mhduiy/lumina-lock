@@ -25,6 +25,19 @@ lumina-lock (0.4.13) unstable; urgency=medium
     keyboard for as long as it is up.
   * LUMINA_POWER_DRY_RUN=1 makes the menu log the action instead of performing
     it. It can only ever prevent an action, so it is harmless to ship.
+  * Fixed the two update rows doing nothing. They addressed lastore under its
+    classic name, com.deepin.lastore, which does not exist in the 6.x generation:
+    the availability probe therefore answered "no update daemon" and both rows
+    stayed dimmed, so clicking them could not do anything at all. They now use
+    org.deepin.dde.Lastore1 / /org/deepin/dde/Lastore1 / ...Lastore1.Manager, and
+    the probe reports updatesAvailable=true against the machine this was reported
+    from. The show log carries that flag, so it can be confirmed at a glance.
+  * Made the confirmation countdown restart rather than resume. Cancelling with
+    Esc and arming the same row again continued from wherever the cancelled fill
+    had stopped, because the fill's width was animated and left part-way: the
+    second press could act almost immediately. A fresh arm now resets the
+    progress to zero before counting. Measured: not fired 0.9s after re-arming,
+    fired 1.4s after it.
   * Fixed the empty window left over the desktop after the first unlock — the
     lock's own long-standing bug, not something the menu introduced, and the
     reason the menu used to draw nothing when it borrowed those surfaces.
