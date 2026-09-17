@@ -9,7 +9,7 @@ Build-Depends: debhelper (>= 13),
  qt6-multimedia-dev,
  libpam0g-dev,
  libxcb1-dev,
- libdtkcore-dev,
+ libdtk6core-dev,
  dde-control-center-dev
 Standards-Version: 4.6.2
 Homepage: https://example.com/lumina-lock
