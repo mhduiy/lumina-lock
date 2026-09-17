@@ -38,9 +38,12 @@ Item {
     readonly property var rows: Power.options
     readonly property bool interactive: shown
 
-    // Visibility follows `shown` directly, never the animated opacity: gating it
-    // on an animating value is how a surface ends up interactive but invisible.
-    visible: shown
+    // Visible while it is up *and* while it is leaving. Gating this on `shown`
+    // alone makes the exit instantaneous — the item disappears on the frame the
+    // fade starts, which is why cancelling the menu cut instead of fading. It
+    // still never depends on an animating value *alone*, which is how a surface
+    // ends up interactive but invisible.
+    visible: shown || opacity > 0.001
     opacity: shown ? 1 : 0
     // `active: false` rather than `duration: 0`: a zero-length animation is not
     // guaranteed to land the value at all, and an opacity that never arrives
@@ -79,7 +82,12 @@ Item {
         }
         opacity: root.shown ? 1 : 0
         MotionBehavior on opacity { active: !root.instant; duration: 320 }
-        MouseArea { anchors.fill: parent }   // swallow clicks aimed past the rows
+        // Blank space is "get me out of here": clicking past the rows dismisses
+        // the menu. The rows sit above this and take their own clicks.
+        MouseArea {
+            anchors.fill: parent
+            onClicked: Power.dismiss()
+        }
     }
 
     // Two washes, rotated so their linear gradients read as soft light rather
@@ -231,9 +239,20 @@ Item {
                     anchors.top: parent.top
                     height: 68 * root.unit
                     radius: 14 * root.unit
+                    // Rounded corners plus a border are jagged without this.
+                    antialiasing: true
                     color: Theme.surface
-                    border.width: 1
-                    border.color: row.selected ? Theme.surfaceBorderFocus : Theme.surfaceBorder
+                    // Scaled like every other dimension here, and a little
+                    // heavier than a hairline: the rows are what is being aimed
+                    // at, and the shutdown row's colour has to read as an edge
+                    // rather than a tint.
+                    border.width: 1 * root.unit
+                    // Shutdown carries the danger colour on its edge, selected or
+                    // not: it is the one row that cannot be taken back.
+                    border.color: row.modelData.key === "shutdown"
+                                  ? (row.selected ? Theme.error
+                                                  : Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, 0.55))
+                                  : (row.selected ? Theme.surfaceBorderFocus : Theme.surfaceBorder)
                     Behavior on border.color { ColorAnimation { duration: 240 } }
 
                     // The armed fill sweeps the row from the leading edge. Long
@@ -245,6 +264,7 @@ Item {
                         anchors.bottom: parent.bottom
                         width: parent.width * armFill.progress
                         radius: parent.radius
+                        antialiasing: true
                         opacity: armFill.progress > 0.001 ? 1 : 0
                         property real progress: 0
                         gradient: Gradient {
@@ -272,6 +292,7 @@ Item {
                         width: 3 * root.unit
                         height: (row.selected ? 26 : 10) * root.unit
                         radius: width / 2
+                        antialiasing: true
                         opacity: row.selected ? 1 : 0.35
                         gradient: Gradient {
                             GradientStop { position: 0.0; color: Theme.accent }
@@ -362,6 +383,15 @@ Item {
             font.letterSpacing: 1 * root.unit
             opacity: 0.75
         }
+    }
+
+    // The window is hidden once this has played. A timer rather than an
+    // animation's finished signal because the exit is three separate fades
+    // (cover, backdrop, rows); it only has to outlast the longest of them.
+    Timer {
+        interval: 340
+        running: !root.shown
+        onTriggered: Power.exitFinished()
     }
 
     // --- behaviour ----------------------------------------------------------

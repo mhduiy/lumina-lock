@@ -19,6 +19,9 @@ class LockSession : public QObject
     Q_PROPERTY(QString userName READ userName CONSTANT)
     Q_PROPERTY(QString displayName READ displayName CONSTANT)
     Q_PROPERTY(QString hostName READ hostName CONSTANT)
+    // The account's picture, or empty when there is none worth showing. Read
+    // from the same place dde-lock reads it (see fetchAvatar()).
+    Q_PROPERTY(QString avatarPath READ avatarPath NOTIFY avatarPathChanged)
     Q_PROPERTY(bool authenticating READ authenticating NOTIFY authenticatingChanged)
     Q_PROPERTY(bool locked READ locked NOTIFY lockedChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
@@ -28,6 +31,7 @@ public:
 
     QString userName() const { return m_userName; }
     QString displayName() const { return m_displayName; }
+    QString avatarPath() const { return m_avatarPath; }
     QString hostName() const { return m_hostName; }
     bool authenticating() const { return m_authenticating; }
     bool locked() const { return m_locked; }
@@ -69,6 +73,7 @@ public slots:
 signals:
     void authenticatingChanged();
     void errorMessageChanged();
+    void avatarPathChanged();
     void lockedChanged(bool locked);
     void authenticationFinished(bool success, const QString &message);
     void unlocked();
@@ -88,6 +93,8 @@ private:
     PamAuthenticator *m_auth = nullptr;
     QString m_userName;
     QString m_displayName;
+    QString m_avatarPath;
+    void fetchAvatar();
     QString m_hostName;
     bool m_authenticating = false;
     bool m_locked = true;

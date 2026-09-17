@@ -20,6 +20,16 @@ Window {
     color: "transparent"
     title: "Lumina Power"
 
+    // Declared here rather than set from C++ after the window exists: setting
+    // window flags makes Qt destroy and recreate the native window, and whether
+    // the window manager has already decided to manage it then depends on how
+    // that recreation lines up with the mapping — which is why the open
+    // animation appeared only sometimes. Declared up front there is nothing to
+    // race. X11BypassWindowManagerHint is what makes the window override-redirect
+    // (unmanaged: no open animation, no taskbar entry); it means nothing on
+    // Wayland, where it is ignored.
+    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.X11BypassWindowManagerHint
+
     PowerScreen {
         id: menu
         anchors.fill: parent

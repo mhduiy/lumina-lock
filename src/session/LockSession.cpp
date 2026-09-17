@@ -6,6 +6,11 @@
 #include <QCoreApplication>
 #include <QDBusConnection>
 #include <QDBusInterface>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
+#include <QDBusVariant>
+#include <QFileInfo>
+#include <QUrl>
 #include <QDebug>
 
 #include <pwd.h>
@@ -38,6 +43,59 @@ LockSession::LockSession(PamAuthenticator *auth, QObject *parent)
 
     connect(m_auth, &PamAuthenticator::finished,
             this, &LockSession::onAuthFinished);
+
+    fetchAvatar();
+}
+
+// dde-lock reads the account picture from the accounts service on the *system*
+// bus: IconFile on /org/deepin/dde/Accounts1/User<uid>, and it accepts the answer
+// only if the file exists and is not empty. Same source, same check; the scene
+// falls back to the letter avatar when there is nothing to show. Fetched
+// asynchronously because this is the lock's startup path — a service that is slow
+// to answer must not delay the first frame.
+void LockSession::fetchAvatar()
+{
+    const QString path = QStringLiteral("/org/deepin/dde/Accounts1/User%1").arg(getuid());
+    // The property has to be read through the Properties interface, not by
+    // giving asyncCall a dotted "Properties.Get" as the method name on the user
+    // interface: that builds an invalid member and libdbus aborts the process.
+    QDBusInterface props(QStringLiteral("org.deepin.dde.Accounts1"), path,
+                         QStringLiteral("org.freedesktop.DBus.Properties"),
+                         QDBusConnection::systemBus());
+    if (!props.isValid())
+        return; // no accounts service on this system: the initial stands
+
+    auto *watcher = new QDBusPendingCallWatcher(
+        props.asyncCall(QStringLiteral("Get"), QStringLiteral("org.deepin.dde.Accounts1.User"),
+                        QStringLiteral("IconFile")),
+        this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher] {
+        const QDBusPendingReply<QVariant> reply = *watcher;
+        watcher->deleteLater();
+        if (!reply.isValid())
+            return;
+
+        // Properties.Get answers with a variant, and Qt may or may not have
+        // already unwrapped it depending on how the reply was built. Unwrap only
+        // when there is something to unwrap, instead of assuming one shape.
+        QVariant value = reply.value();
+        if (value.canConvert<QDBusVariant>())
+            value = value.value<QDBusVariant>().variant();
+        const QString url = value.toString();
+        const QString file = url.startsWith(QLatin1String("file://")) ? QUrl(url).toLocalFile() : url;
+        const QFileInfo info(file);
+        if (file.isEmpty() || !info.exists() || !info.isFile() || info.size() <= 0)
+            return; // nothing set for this account
+
+        // Handed to QML as a URL: Image.source does not take a bare filesystem
+        // path (a leading slash is resolved as a resource path there).
+        const QString url2 = QUrl::fromLocalFile(file).toString();
+        if (m_avatarPath == url2)
+            return;
+        m_avatarPath = url2;
+        qWarning().noquote() << "LockSession: account avatar" << m_avatarPath;
+        Q_EMIT avatarPathChanged();
+    });
 }
 
 void LockSession::setUser(const QString &user)

@@ -16,6 +16,16 @@ Window {
     // wants to be, so hiding it from C++ does not stick and an empty window is
     // left mapped over the desktop after the first unlock.
     color: "#000000"
+
+    // dde-lock parity: on X11 the lock windows are unmanaged and always on top,
+    // so nothing can raise itself over the lock and the deepin WM does not
+    // animate them. Declared here rather than set from C++: setting window flags
+    // makes Qt destroy and recreate the native window, and whether the window
+    // manager has already decided to manage it then depends on how that
+    // recreation lines up with the mapping — the same race that made the power
+    // menu animate open only some of the time. X11BypassWindowManagerHint means
+    // nothing on Wayland and is ignored there.
+    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.X11BypassWindowManagerHint
     title: "Lumina Lock"
 
     readonly property real u: height / 1080

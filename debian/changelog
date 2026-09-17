@@ -25,6 +25,65 @@ lumina-lock (0.4.13) unstable; urgency=medium
     keyboard for as long as it is up.
   * LUMINA_POWER_DRY_RUN=1 makes the menu log the action instead of performing
     it. It can only ever prevent an action, so it is harmless to ship.
+  * Removed the jagged edges. Qt Quick draws rounded corners and scaled images
+    without smoothing unless asked, and the panels that were already smooth
+    (GlassPanel, and so the password pill) are the ones that had been asked:
+    the avatar's circle and its mask, the scaled account picture, and the menu's
+    rows, arm fill and marker were not. All of them now set antialiasing or
+    smooth as appropriate.
+  * Show the account's own picture instead of always drawing the initial. It
+    comes from the same place dde-lock takes it: IconFile on the accounts service
+    (system bus, /org/deepin/dde/Accounts1/User<uid>, interface
+    org.deepin.dde.Accounts1.User), and it is used only when the file exists and
+    is not empty — otherwise the initial stands, exactly as the reference does.
+    Fetched asynchronously, because this is the lock's startup path.
+    Two mistakes on the way there, both caught by running it rather than reading
+    it: asking asyncCall for "org.freedesktop.DBus.Properties.Get" as a method on
+    the *user* interface builds an invalid member name and libdbus aborts the
+    process (the lock would have crashed on startup); and Properties.Get answers
+    with a variant that Qt may already have unwrapped, so unwrapping
+    unconditionally turned the path into nothing. The same unwrap bug was in the
+    lastore CheckUpdateMode read, which would have handed the update daemon mode
+    0.
+  * Made the password character bigger (16 * unit -> 22 * unit) and put the
+    border weight back to 1 * unit, which is where it started — an earlier
+    "1.4 * unit" change never applied (the script that carried it aborted on its
+    first edit), so the borders had stayed at 2 * unit throughout.
+  * Removed the jagged edges where it is possible without new assets. Qt Quick
+    leaves rounded corners and scaled images unsmoothed unless asked, and the
+    panels that were already smooth (GlassPanel, and with it the password pill)
+    are the ones that had been asked. The avatar's circle and mask, the scaled
+    account picture, and the menu's rows, arm fill and marker now ask too.
+    One edge remains stepped: the outside of a *picture* avatar, because Qt does
+    not antialias a rounded Rectangle when it is rendered into a layer and a
+    layer is what the mask has to be. Doing better needs either a mask image with
+    the soft edge baked in, or a precompiled .qsb fragment shader (Qt 6 rejects
+    inline GLSL — fragmentShader is a URL to a .qsb, and this project ships none).
+  * Thickened the edges that are aimed at: the menu rows and the password pill
+    now use a 2 * unit border instead of a hairline. Both scale with the screen
+    like everything else, and the shutdown row's colour needs the weight to read
+    as an edge rather than a tint.
+  * Gave the menu an exit. It faded in and then cut: the scene gated its own
+    visibility on "is it up", so on the frame the exit began the item vanished,
+    and the window was hidden at the same instant. The scene now stays visible
+    while it is leaving, and the window is hidden only once the exit has played —
+    the scene reports back, with a 1.5s fallback because a window left up would
+    hold the keyboard with nothing on screen. Measured across the exit, the
+    screen goes 44 -> 41 -> 37 -> 29 -> 20 -> 13 -> 0: a decay, not a step.
+  * Clicking past the rows dismisses the menu and returns to the desktop. The
+    rows take their own clicks, so only the space around them is affected.
+  * The shutdown row carries the danger colour on its border, selected or not:
+    it is the one action that cannot be taken back.
+  * Declared both surfaces' window flags in QML instead of setting them from C++
+    after the window already existed. Setting a window flag makes Qt destroy and
+    recreate the native window, so whether the window manager had already decided
+    to manage it depended on how that recreation lined up with the mapping — the
+    open animation appeared only some of the time. Declared up front there is
+    nothing to race: xwininfo reports Override Redirect State: yes for the menu
+    on its first showing and on every reopening, and for the lock window, at the
+    screen's full size. showAll() now logs whether the flag is in place at the
+    moment the window is mapped (bypassWM=true), which is the property that used
+    to be timing-dependent.
   * Fixed the two update rows doing nothing. They addressed lastore under its
     classic name, com.deepin.lastore, which does not exist in the 6.x generation:
     the availability probe therefore answered "no update daemon" and both rows

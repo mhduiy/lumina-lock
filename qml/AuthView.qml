@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Lumina 1.0
 import "components"
 
@@ -44,23 +45,76 @@ Item {
         width: parent.width
         spacing: 0
 
-        // Avatar
-        Rectangle {
+        // Avatar: the account's picture when it has one, the initial when it
+        // does not. LockSession does the fetching and the validation (the file
+        // has to exist and be non-empty) — the same source dde-lock uses — so by
+        // the time this is non-empty it is worth drawing.
+        Item {
+            id: avatar
             anchors.horizontalCenter: parent.horizontalCenter
             width: 72 * auth.unit
             height: 72 * auth.unit
-            radius: width / 2
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: "#5B76D8" }
-                GradientStop { position: 1.0; color: "#3A4FA0" }
+
+            // The initial is also the base layer, so the circle is never empty
+            // while the picture loads (or if it turns out to be unreadable).
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                // Rounded corners and a circle edge are jagged without this.
+                antialiasing: true
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "#5B76D8" }
+                    GradientStop { position: 1.0; color: "#3A4FA0" }
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: auth.initial
+                    color: "#FFFFFF"
+                    font.family: Theme.fontFamily
+                    font.weight: Font.DemiBold
+                    font.pixelSize: 30 * auth.unit
+                }
             }
-            Text {
-                anchors.centerIn: parent
-                text: auth.initial
-                color: "#FFFFFF"
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-                font.pixelSize: 30 * auth.unit
+
+            Image {
+                id: picture
+                anchors.fill: parent
+                source: LockSession.avatarPath
+                sourceSize.width: width * 2   // crisp on HiDPI, no giant decodes
+                sourceSize.height: height * 2
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                smooth: true
+                visible: status === Image.Ready
+                layer.enabled: visible
+                layer.smooth: true
+                layer.effect: MultiEffect {
+                    maskEnabled: true
+                    maskSource: avatarMask
+                }
+            }
+
+            // Round mask for the picture. Kept invisible but layered, which is
+            // how MultiEffect takes a mask.
+            //
+            // A rounded Rectangle is what is available here: an inline fragment
+            // shader is not an option in Qt 6 (fragmentShader is a URL to a .qsb
+            // built by the Qt Shader Tools, and this project ships no precompiled
+            // shaders), and without a mask the picture would be a square. Note
+            // that Qt does not antialias this shape inside a layer, so the outer
+            // edge of a *picture* avatar is a little stepped; the initial below
+            // has no such problem because it is drawn normally.
+            Item {
+                id: avatarMask
+                anchors.fill: parent
+                visible: false
+                layer.enabled: true
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    antialiasing: true
+                    color: "white"
+                }
             }
         }
 

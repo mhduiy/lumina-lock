@@ -48,6 +48,10 @@ Item {
         refreshToken: root.glassRefreshToken
         liveSource: root.glassLive
         dim: root.glassDim
+        // A heavier edge than the default: the pill is the one thing on screen
+        // the user is meant to aim at, and a hairline around frosted glass
+        // disappears against a busy wallpaper.
+        borderWidth: 1 * root.unit
         borderColor: root.feedbackColor.a > 0
                      ? root.feedbackColor
                      : (root.error ? Theme.error

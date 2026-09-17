@@ -5,6 +5,7 @@
 #include "session/dbusnames.h"
 
 #include <QDBusConnection>
+#include <QTimer>
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
 #include <QJsonDocument>
@@ -96,7 +97,10 @@ void PowerSession::queryUpdateMode()
         watcher->deleteLater();
         if (!reply.isValid())
             return;
-        m_updateMode = reply.value().value<QDBusVariant>().variant().toInt();
+        QVariant value = reply.value();
+        if (value.canConvert<QDBusVariant>())
+            value = value.value<QDBusVariant>().variant();
+        m_updateMode = value.toInt();
     });
 }
 
@@ -188,9 +192,22 @@ void PowerSession::dismiss()
     m_visible = false;
     Q_EMIT Visible(false);
 
+    // The scene fades out over the desktop — the window is transparent, so that
+    // is a real dissolve and not a window close. Hiding the window here would cut
+    // it off at the first frame, which is why cancelling the menu looked
+    // instant. The scene reports when it has finished; the timer is the fallback
+    // for a scene that never reports, because a window left up would hold the
+    // keyboard grab with nothing on screen.
     if (m_screens)
-        m_screens->hidePowerMenu();
+        QTimer::singleShot(1500, this, [this] { exitFinished(); });
     m_overDesktop = false;
+}
+
+void PowerSession::exitFinished()
+{
+    if (!m_screens || m_visible)
+        return; // dismissed and not re-opened since
+    m_screens->hidePowerMenu();
 }
 
 void PowerSession::requestSessionMethod(const QString &method)

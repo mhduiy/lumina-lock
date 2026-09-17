@@ -121,6 +121,7 @@ void ScreenManager::showAll()
         qWarning().nospace() << "ScreenManager: showAll window visible=" << window->isVisible()
                              << " visibility=" << static_cast<int>(window->visibility())
                              << " exposed=" << window->isExposed()
+                             << " bypassWM=" << bool(window->flags() & Qt::X11BypassWindowManagerHint)
                              << " geometry=" << window->geometry().width() << "x"
                              << window->geometry().height();
     }
@@ -147,19 +148,9 @@ void ScreenManager::showPowerMenu()
                                  << "is not a Window";
             return;
         }
-        m_powerWindow->setFlag(Qt::FramelessWindowHint, true);
-        m_powerWindow->setFlag(Qt::WindowStaysOnTopHint, true);
-        // Same treatment as the lock's own windows: on X11 they are
-        // override-redirect, which is what keeps the window manager from
-        // animating them open or putting them in the taskbar.
-        if (!qEnvironmentVariableIsSet("XDG_SESSION_TYPE")
-            || qEnvironmentVariable("XDG_SESSION_TYPE") != QLatin1String("wayland")) {
-            m_powerWindow->setFlag(Qt::X11BypassWindowManagerHint, true);
-        }
-        // Transparent so the menu can fade in over the desktop.
-        m_powerWindow->setColor(Qt::transparent);
-        // A window of its own, managed normally: it has to take the keyboard
-        // away from the desktop, which a bypass-WM window does poorly.
+        // Flags and colour are declared in qml/PowerWindow.qml so that they are
+        // in place before any native window exists; setting them here would
+        // recreate the native window and race the mapping.
         //
         // Sized from the screen the way the lock's windows are: a window that is
         // only asked to go fullscreen keeps whatever geometry it was created
@@ -440,15 +431,9 @@ void ScreenManager::createWindowForScreen(QScreen *screen)
     }
 
     window->setTitle(QStringLiteral("Lumina Lock"));
-    window->setColor(Qt::black);
-    window->setFlag(Qt::FramelessWindowHint, true);
-    // dde-lock parity: on X11 the lock windows are unmanaged and always on
-    // top; the deepin WM recognises them via the _DEEPIN_LOCK_SCREEN property.
-    if (!qEnvironmentVariableIsSet("XDG_SESSION_TYPE")
-        || qEnvironmentVariable("XDG_SESSION_TYPE") != QLatin1String("wayland")) {
-        window->setFlag(Qt::WindowStaysOnTopHint, true);
-        window->setFlag(Qt::X11BypassWindowManagerHint, true);
-    }
+    // Flags and colour are declared in qml/LockScreen.qml so that they are in
+    // place before any native window exists; setting them here would recreate
+    // the native window and race the mapping.
     window->setScreen(screen);
     window->setGeometry(screen->geometry());
     markAsLockWindow(window);

@@ -45,6 +45,9 @@ public:
     void updateAndReboot();
 
     Q_INVOKABLE void dismiss();
+    // Called by the scene when its exit animation has played; the window is
+    // hidden then, not when dismiss() is called.
+    Q_INVOKABLE void exitFinished();
     // Runs one row. The scene only calls this once its row is armed.
     Q_INVOKABLE void activate(const QString &key);
     // Relays the D-Bus ChangKey the way dde-lock does when the highlight moves.
