@@ -17,6 +17,10 @@
 #include <QTimer>
 #include <QUrl>
 
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
+
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
@@ -149,6 +153,23 @@ int main(int argc, char *argv[])
         else
             screens.hideAll();
     });
+
+#ifdef __GLIBC__
+    // Hand the decoder's freed heap back to the OS once it is gone. libavcodec's
+    // per-thread frame buffers (16 threads on this 16-core box, one glibc arena
+    // each) and the arenas themselves stay resident after the QML Loader
+    // destroys the MediaPlayer, so without this the resident lock ratcheted
+    // ~55 MB per lock/unlock cycle with a 4K video wallpaper (measured over four
+    // cycles: unlocked 622 → 808 MB, locked 773 → 911 MB, still climbing) instead
+    // of settling. The trim runs after the loader has had a frame or two to tear
+    // the decoder down; with it the unlocked footprint settles at ~460 MB and
+    // consecutive cycles stop growing.
+    QObject::connect(&session, &LockSession::lockedChanged, &app, [](bool locked) {
+        if (locked)
+            return;
+        QTimer::singleShot(1500, qApp, [] { malloc_trim(0); });
+    });
+#endif
 
     // ShowAuth(true) comes from the session (dock, hotkey, …): the prompt
     // belongs on the primary screen unless the user is working elsewhere.
