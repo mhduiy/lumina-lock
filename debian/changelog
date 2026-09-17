@@ -25,6 +25,20 @@ lumina-lock (0.4.13) unstable; urgency=medium
     keyboard for as long as it is up.
   * LUMINA_POWER_DRY_RUN=1 makes the menu log the action instead of performing
     it. It can only ever prevent an action, so it is harmless to ship.
+  * Fixed the empty window left over the desktop after the first unlock — the
+    lock's own long-standing bug, not something the menu introduced, and the
+    reason the menu used to draw nothing when it borrowed those surfaces.
+    Both the lock's window and the menu's declared `visibility: Window.FullScreen`
+    in QML, which states what the window wants to be and fights the C++ that
+    hides it: after an unlock the lock's window stayed mapped over the desktop
+    (visible in the taskbar, clearable only with Alt+F4) and clicks never reached
+    the desktop. Visibility is now owned by ScreenManager alone. Proven by the
+    new logging, which reads the state *after* the hide: `hideAll after
+    visible=false visibility=0`.
+  * The menu's window is override-redirect on X11 — the same treatment the lock's
+    own windows get — so the window manager neither animates it open nor lists
+    it, and it is transparent, so the menu fades in out of the desktop rather
+    than opening as a window.
   * The menu now draws in a window of its own instead of as a layer on the lock's
     surfaces. The lock's windows are hidden and re-shown around every lock and
     unlock, and this package's own logging showed the failure mode that follows

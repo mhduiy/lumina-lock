@@ -11,8 +11,11 @@ import "components"
 Window {
     id: root
 
+    // Visibility is owned by ScreenManager (showFullScreen / hide). Declaring
+    // `visibility: Window.FullScreen` here fights that: the window states what it
+    // wants to be, so hiding it from C++ does not stick and an empty window is
+    // left mapped over the desktop after the first unlock.
     color: "#000000"
-    visibility: Window.FullScreen
     title: "Lumina Lock"
 
     readonly property real u: height / 1080

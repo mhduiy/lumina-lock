@@ -149,6 +149,15 @@ void ScreenManager::showPowerMenu()
         }
         m_powerWindow->setFlag(Qt::FramelessWindowHint, true);
         m_powerWindow->setFlag(Qt::WindowStaysOnTopHint, true);
+        // Same treatment as the lock's own windows: on X11 they are
+        // override-redirect, which is what keeps the window manager from
+        // animating them open or putting them in the taskbar.
+        if (!qEnvironmentVariableIsSet("XDG_SESSION_TYPE")
+            || qEnvironmentVariable("XDG_SESSION_TYPE") != QLatin1String("wayland")) {
+            m_powerWindow->setFlag(Qt::X11BypassWindowManagerHint, true);
+        }
+        // Transparent so the menu can fade in over the desktop.
+        m_powerWindow->setColor(Qt::transparent);
         // A window of its own, managed normally: it has to take the keyboard
         // away from the desktop, which a bypass-WM window does poorly.
         //
@@ -209,6 +218,14 @@ void ScreenManager::hideAll()
     setAuthScreen(nullptr);
     for (QQuickWindow *window : std::as_const(m_windows))
         window->hide();
+
+    // Logged *after* the hide, on purpose: the state before it says nothing
+    // about whether the surfaces actually went away, and "still visible here"
+    // is exactly what an empty window left over the desktop looks like.
+    for (QQuickWindow *window : std::as_const(m_windows)) {
+        qWarning().nospace() << "ScreenManager: hideAll after visible=" << window->isVisible()
+                             << " visibility=" << static_cast<int>(window->visibility());
+    }
 }
 
 void ScreenManager::setInputGrabbed(bool grabbed)

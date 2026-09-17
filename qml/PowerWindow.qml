@@ -12,11 +12,12 @@ import Lumina 1.0
 Window {
     id: root
 
-    // Opaque, and it never fades in as a whole: the menu covers the screen on
-    // its first frame so neither the desktop nor the borrowed lock scene is
-    // visible behind it for even a moment.
-    color: "#05070D"
-    visibility: Window.FullScreen
+    // Transparent, and it fades in: the menu should read as arriving out of the
+    // desktop rather than as a window opening. The window itself is
+    // override-redirect (set in ScreenManager, matching the lock's own windows),
+    // so the window manager neither animates it in nor lists it.
+    // Visibility is owned by ScreenManager, not declared here — see LockScreen.
+    color: "transparent"
     title: "Lumina Power"
 
     PowerScreen {
@@ -24,7 +25,7 @@ Window {
         anchors.fill: parent
         unit: root.height / 1080
         shown: Power.visible
-        instant: true
+        instant: false
         onActivated: (key) => Power.activate(key)
     }
 }
