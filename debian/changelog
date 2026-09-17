@@ -1,4 +1,4 @@
-lumina-lock (0.4.12-1) unstable; urgency=medium
+lumina-lock (0.4.12) unstable; urgency=medium
 
   * Multi-screen: the authentication UI now follows the user instead of being
     pinned to the primary screen. Every screen runs the same surface, and

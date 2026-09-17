@@ -163,15 +163,15 @@ dde-lock 并不是独立包：可执行文件、D-Bus service 文件、PAM 配�
 
 ```bash
 # 需安装构建依赖：qt6-base-dev qt6-declarative-dev qt6-multimedia-dev libpam0g-dev libxcb1-dev \
-#   libdtkcore-dev dde-control-center-dev debhelper cmake
-dpkg-buildpackage -b -us -uc     # 产物在上级目录 lumina-lock_0.4.11-1_amd64.deb
+#   libdtk6core-dev dde-control-center-dev debhelper cmake
+dpkg-buildpackage -b -us -uc     # 产物在上级目录 lumina-lock_0.4.12_amd64.deb
 ```
 
 ### 安装 / 卸载 / 回退
 
 ```bash
 # 安装（替换 dde-lock）
-sudo dpkg -i lumina-lock_0.4.11-1_amd64.deb
+sudo dpkg -i lumina-lock_0.4.12_amd64.deb
 systemctl --user daemon-reload
 systemctl --user restart dde-lock.service   # 让新锁屏接管；或直接重新登录
 
