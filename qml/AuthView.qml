@@ -97,20 +97,6 @@ Item {
             onEscapePressed: auth.cancel()
             onTextEdited: auth.clearError()
         }
-
-        Item { width: 1; height: 12 * auth.unit }
-
-        // Inline error — never a modal MessageBox.
-        Text {
-            id: errorLabel
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: auth.errorText
-            color: Theme.error
-            font.family: Theme.fontFamily
-            font.pixelSize: 14 * auth.unit
-            opacity: auth.errorText !== "" ? 1 : 0
-            MotionBehavior on opacity { duration: 180 }
-        }
     }
 
     function clearError() {
