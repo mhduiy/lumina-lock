@@ -49,6 +49,18 @@ public:
     /** The single QML surface every screen runs. */
     void setSurfaceUrl(const QUrl &url) { m_surfaceUrl = url; }
 
+    /** The power menu's own surface (see qml/PowerWindow.qml). */
+    void setPowerUrl(const QUrl &url) { m_powerUrl = url; }
+
+    /**
+     * Show/hide the power menu's window. It is a window of its own rather than a
+     * layer on the lock's: the lock's windows are hidden and re-shown around
+     * every unlock, and a surface drawn into one of them inherits whatever state
+     * that leaves behind.
+     */
+    void showPowerMenu();
+    void hidePowerMenu();
+
     /** Name of the screen carrying the authentication UI, empty when none. */
     QString authScreenName() const;
 
@@ -116,6 +128,8 @@ private:
 
     QQmlEngine *m_engine = nullptr;
     QUrl m_surfaceUrl;
+    QUrl m_powerUrl;
+    QPointer<QQuickWindow> m_powerWindow;
     QHash<QScreen *, QQuickWindow *> m_windows;
     /** Screen carrying the password field; nullptr while the lock is idle. */
     QScreen *m_authScreen = nullptr;

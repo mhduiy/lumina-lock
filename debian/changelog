@@ -1,3 +1,62 @@
+lumina-lock (0.4.13) unstable; urgency=medium
+
+  * Added the session power menu — what dde-lock provides as
+    org.deepin.dde.ShutdownFront1. The dock's power button, the launcher's and
+    any session-issued request reach it, and its .service file activates this
+    same binary, so the process that owns the lock owns this too.
+    The method and signal names are dde-lock's, so nothing that calls it can
+    tell the difference; only the surface is new, and it is not a copy of the
+    original's grid of tiles: a vertical stack of rows over a two-tone gradient
+    that drifts while the menu is open, the selection carried by a marker that
+    changes height and a chevron that eases in, the rows arriving one after
+    another, and destructive rows that fill for a beat before acting — moving
+    away or pressing Esc takes the arm back.
+  * Availability is asked for rather than assumed: CanShutdown, CanReboot,
+    CanLogout, CanSuspend and CanHibernate decide which rows are live, and the
+    two update rows (UpdateAndShutdown / UpdateAndReboot, which hand the request
+    to lastore's PrepareFullScreenUpgrade so the update daemon runs the upgrade
+    and brings the machine down itself) are dimmed with a reason when there is
+    no update daemon to hand them to.
+  * Fixed a keyboard bug that this work exposed. ScreenManager reroutes a key
+    press to whichever screen the pointer is on, and treated "no screen claimed
+    yet" as another screen, so it consumed the key. With the power menu up, every
+    key aimed at it was swallowed whenever the pointer sat anywhere but the auth
+    screen — the normal case on a multi-screen desk. The menu now takes the
+    keyboard for as long as it is up.
+  * LUMINA_POWER_DRY_RUN=1 makes the menu log the action instead of performing
+    it. It can only ever prevent an action, so it is harmless to ship.
+  * The menu now draws in a window of its own instead of as a layer on the lock's
+    surfaces. The lock's windows are hidden and re-shown around every lock and
+    unlock, and this package's own logging showed the failure mode that follows
+    from borrowing them: the menu reached a fully settled scene (shown, opacity
+    1.0, correct size, eight rows) and nothing appeared, because the window it
+    was drawing into had been left in a state the window manager would not
+    present — after an unlock a surface stayed mapped over the desktop (visible
+    in the taskbar, cleared only with Alt+F4). A window that only ever shows the
+    menu has nothing else to go wrong, and the lock's window lifetime is no
+    longer on the path at all.
+    The window is sized from its screen the way the lock's windows are, because
+    a window that is merely asked to go fullscreen keeps the geometry it was
+    created with until the window manager answers — the first attempt drew the
+    menu into a 160x160 corner.
+  * Fixed two problems the first hands-on test of the menu turned up.
+    - It blocked the GUI thread — and held the keyboard grab — while asking the
+      session manager which actions were available. Those Can* calls are
+      synchronous and ran inside a D-Bus method handler, so a session manager
+      that was slow to answer, or that was itself waiting on our reply,
+      deadlocked: the page never appeared and the session had no keyboard, which
+      is indistinguishable from the lock having taken the machine hostage.
+      Against a session manager that answers in 3s, Show() took 15.0s and is now
+      measured at 0.01s. Availability is cached and refreshed asynchronously, and
+      lastore's CheckUpdateMode is read asynchronously as well.
+    - Shown over an unlocked session it flashed the lock's own clock before the
+      menu: bringing the borrowed surfaces up starts the lock's entry reveal.
+      Over an unlocked session the menu now covers the screen on its first frame
+      and fades nothing; the rows keep their stagger, which happens over an
+      already-opaque cover.
+
+ -- Lumina <lumina@example.com>  Wed, 17 Sep 2026 15:10:00 +0800
+
 lumina-lock (0.4.12) unstable; urgency=medium
 
   * Multi-screen: the authentication UI now follows the user instead of being

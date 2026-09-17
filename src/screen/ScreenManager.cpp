@@ -105,13 +105,102 @@ void ScreenManager::showAll()
         window->showFullScreen();
         window->raise();
         window->requestActivate();
+        // A window that was hidden and is mapped again does not necessarily get
+        // painted: Qt drops the scene graph when a window is hidden, and the
+        // rebuild is not guaranteed until something asks for a frame. Without
+        // this the surface is up, mapped, and shows nothing.
+        window->requestUpdate();
     }
     chooseGrabWindow();
     setInputGrabbed(true);
+
+    // The state each surface ended up in. "Shown but never mapped" and "mapped
+    // but never painted" look identical from the outside, and the caller that
+    // asked for them has no other way to tell which one it got.
+    for (QQuickWindow *window : std::as_const(m_windows)) {
+        qWarning().nospace() << "ScreenManager: showAll window visible=" << window->isVisible()
+                             << " visibility=" << static_cast<int>(window->visibility())
+                             << " exposed=" << window->isExposed()
+                             << " geometry=" << window->geometry().width() << "x"
+                             << window->geometry().height();
+    }
+}
+
+void ScreenManager::showPowerMenu()
+{
+    if (!m_powerWindow) {
+        if (m_powerUrl.isEmpty() || !m_engine) {
+            qWarning() << "ScreenManager: no power surface configured";
+            return;
+        }
+        QQmlComponent component(m_engine, m_powerUrl, this);
+        if (component.isError()) {
+            qWarning().noquote() << "ScreenManager: failed to load" << m_powerUrl.toString();
+            const auto errors = component.errors();
+            for (const QQmlError &error : errors)
+                qWarning().noquote() << "  " << error.toString();
+            return;
+        }
+        m_powerWindow = qobject_cast<QQuickWindow *>(component.create());
+        if (!m_powerWindow) {
+            qWarning().noquote() << "ScreenManager: root of" << m_powerUrl.toString()
+                                 << "is not a Window";
+            return;
+        }
+        m_powerWindow->setFlag(Qt::FramelessWindowHint, true);
+        m_powerWindow->setFlag(Qt::WindowStaysOnTopHint, true);
+        // A window of its own, managed normally: it has to take the keyboard
+        // away from the desktop, which a bypass-WM window does poorly.
+        //
+        // Sized from the screen the way the lock's windows are: a window that is
+        // only asked to go fullscreen keeps whatever geometry it was created
+        // with until the window manager answers, and until then the menu draws
+        // into a 160x160 corner.
+        QScreen *target = nullptr;
+        if (m_authScreen)
+            target = m_authScreen;
+        else if (!m_windows.isEmpty())
+            target = m_windows.constBegin().value()->screen();
+        if (!target)
+            target = QGuiApplication::primaryScreen();
+        if (target) {
+            m_powerWindow->setScreen(target);
+            m_powerWindow->setGeometry(target->geometry());
+        }
+        m_powerWindow->installEventFilter(this);
+    }
+
+    m_powerWindow->showFullScreen();
+    m_powerWindow->raise();
+    m_powerWindow->requestActivate();
+    m_powerWindow->requestUpdate();
+
+    // The keyboard belongs to the menu while it is up; the grab moves with it.
+    m_grabWindow = m_powerWindow;
+    m_grabInput = true;
+    applyKeyboardGrab();
+
+    qWarning().nospace() << "ScreenManager: showPowerMenu visible=" << m_powerWindow->isVisible()
+                         << " visibility=" << static_cast<int>(m_powerWindow->visibility());
+}
+
+void ScreenManager::hidePowerMenu()
+{
+    m_grabInput = false;
+    applyKeyboardGrab();
+    m_grabWindow = nullptr; // next lock re-picks one of its own windows
+    if (m_powerWindow)
+        m_powerWindow->hide();
+    qWarning() << "ScreenManager: hidePowerMenu";
 }
 
 void ScreenManager::hideAll()
 {
+    qWarning().nospace() << "ScreenManager: hideAll windows=" << m_windows.size();
+    for (QQuickWindow *window : std::as_const(m_windows)) {
+        qWarning().nospace() << "ScreenManager: hideAll window visible=" << window->isVisible()
+                             << " visibility=" << static_cast<int>(window->visibility());
+    }
     m_visible = false;
     // Release before hiding. Unmapping a window implicitly drops its grabs, but
     // being explicit guarantees the desktop is usable even if a hide is missed.
@@ -204,6 +293,7 @@ void ScreenManager::clearAuth()
 
 void ScreenManager::setInteractive(bool interactive)
 {
+    qWarning().nospace() << "ScreenManager: setInteractive " << interactive;
     m_interactive = interactive;
 }
 
@@ -245,6 +335,8 @@ bool ScreenManager::eventFilter(QObject *watched, QEvent *event)
 
 void ScreenManager::setAuthScreen(QScreen *screen)
 {
+    qWarning().nospace() << "ScreenManager: setAuthScreen "
+                         << (screen ? screen->name() : QStringLiteral("none"));
     if (screen == m_authScreen)
         return;
 

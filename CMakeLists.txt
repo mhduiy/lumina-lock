@@ -41,6 +41,10 @@ qt_add_executable(lumina-lock
     src/session/LockSession.cpp
     src/session/LockSession.h
     src/session/dbusnames.h
+    src/power/PowerService.cpp
+    src/power/PowerService.h
+    src/power/PowerSession.cpp
+    src/power/PowerSession.h
     src/wallpaper/WallpaperConfig.cpp
     src/wallpaper/WallpaperConfig.h
     src/wallpaper/WallpaperManager.cpp

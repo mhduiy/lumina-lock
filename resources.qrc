@@ -2,6 +2,8 @@
     <qresource prefix="/">
         <file>qml/Theme.qml</file>
         <file>qml/LockScreen.qml</file>
+        <file>qml/PowerScreen.qml</file>
+        <file>qml/PowerWindow.qml</file>
         <file>qml/ClockView.qml</file>
         <file>qml/AuthView.qml</file>
         <file>qml/WallpaperHost.qml</file>

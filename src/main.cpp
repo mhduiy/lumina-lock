@@ -1,5 +1,7 @@
 #include "appearance/AppearanceConfig.h"
 #include "auth/PamAuthenticator.h"
+#include "power/PowerService.h"
+#include "power/PowerSession.h"
 #include "screen/ScreenManager.h"
 #include "session/LockService.h"
 #include "session/LockSession.h"
@@ -135,16 +137,25 @@ int main(int argc, char *argv[])
     QQmlEngine engine;
     screens.setEngine(&engine);
 
+    // The power menu: behaviour here, surface in qml/PowerScreen.qml, both
+    // reached from QML through the `Power` singleton.
+    PowerSession powerSession;
+    powerSession.setLockSession(&session);
+    powerSession.setScreenManager(&screens);
+    PowerService powerService(&powerSession);
+
     qmlRegisterSingletonInstance("Lumina", 1, 0, "WallpaperManager", &wallpaper);
     qmlRegisterSingletonInstance("Lumina", 1, 0, "LockSession", &session);
     qmlRegisterSingletonInstance("Lumina", 1, 0, "LockAppearance", &appearanceConfig);
     qmlRegisterSingletonInstance("Lumina", 1, 0, "Screens", &screens);
+    qmlRegisterSingletonInstance("Lumina", 1, 0, "Power", &powerSession);
     qmlRegisterSingletonType(QUrl(QStringLiteral("qrc:/qml/Theme.qml")),
                              "Lumina", 1, 0, "Theme");
 
     // Every screen runs the same surface; which one carries the password field
     // is decided at runtime (see ScreenManager).
     screens.setSurfaceUrl(QUrl(QStringLiteral("qrc:/qml/LockScreen.qml")));
+    screens.setPowerUrl(QUrl(QStringLiteral("qrc:/qml/PowerWindow.qml")));
 
     // Resident service: unlocking hides the surfaces, locking shows them again.
     QObject::connect(&session, &LockSession::lockedChanged, &app, [&screens](bool locked) {
@@ -182,6 +193,15 @@ int main(int argc, char *argv[])
 
     // dde-lock compatible surface.
     bus.registerObject(LOCK_FRONT_PATH, &session, QDBusConnection::ExportAdaptors);
+
+    // The power menu's surface. DDE reaches it through the ShutdownFront1
+    // .service file, which activates this same binary, so the dock's power
+    // button, the launcher's and a session-issued request all land here.
+    if (!bus.registerService(POWER_FRONT_SERVICE)) {
+        qWarning().noquote() << "Failed to own" << POWER_FRONT_SERVICE << ":"
+                             << bus.lastError().message();
+    }
+    bus.registerObject(POWER_FRONT_PATH, &powerSession, QDBusConnection::ExportAdaptors);
 
     // Our own control surface (quit / relock for testing).
     if (!bus.registerService(QStringLiteral("org.lumina.Lock"))) {
