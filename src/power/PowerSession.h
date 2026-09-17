@@ -11,9 +11,9 @@ class ScreenManager;
 // dde-lock provides this as `org.deepin.dde.ShutdownFront1`: the dock, the
 // launcher and the power key all reach it over D-Bus, and its .service file
 // activates the very same binary as the lock. This class is that service's
-// behaviour; the surface it drives is an overlay on the lock's own scene
-// (qml/PowerScreen.qml), not a second window — which is what lets it inherit
-// the lock's input grab, per-screen handling and visual language.
+// behaviour; the surface it drives is qml/PowerScreen.qml, drawn in a window of
+// its own (see ScreenManager::showPowerMenu) so that it never inherits the lock
+// window's lifecycle.
 class PowerSession : public QObject
 {
     Q_OBJECT
@@ -75,6 +75,7 @@ private:
     void refreshAvailability();
     void queryCan(const QString &method, bool *slot);
     void queryUpdateMode();
+    void queryUpdateState();
     void requestSessionMethod(const QString &method);
     void requestUpdate(bool powerOff);
     static bool dryRun();
@@ -91,6 +92,12 @@ private:
     bool m_canHibernate = true;
     bool m_updatesAvailable = false;
     int m_updateMode = 0;
+    // Whether lastore has anything to install — *not* whether it is in some
+    // update mode. CheckUpdateMode is a policy setting (5 on a machine with
+    // nothing to install, so it says nothing), while UpgradableApps is the list
+    // itself. The power rows are worded from this, so it has to mean what it
+    // says.
+    bool m_updatesPending = false;
     // True when the menu brought the lock surfaces up over an unlocked session,
     // and therefore has to put them back down when it closes.
     bool m_overDesktop = false;

@@ -29,16 +29,17 @@ QDBusInterface *lastore()
                               QDBusConnection::systemBus());
 }
 
-QVariantMap row(const QString &key, const QString &label, const QString &sub,
-                const QString &kind, bool enabled, const QString &note = QString())
+// One entry per action this machine can actually perform. Anything unavailable
+// is left out entirely rather than greyed: a disabled control advertises
+// something that cannot happen.
+QVariantMap row(const QString &key, const QString &label, const QString &icon,
+                const QString &kind)
 {
     QVariantMap map;
     map.insert(QStringLiteral("key"), key);
     map.insert(QStringLiteral("label"), label);
-    map.insert(QStringLiteral("sub"), sub);
+    map.insert(QStringLiteral("icon"), icon);
     map.insert(QStringLiteral("kind"), kind);
-    map.insert(QStringLiteral("enabled"), enabled);
-    map.insert(QStringLiteral("note"), note);
     return map;
 }
 
@@ -100,7 +101,37 @@ void PowerSession::queryUpdateMode()
         QVariant value = reply.value();
         if (value.canConvert<QDBusVariant>())
             value = value.value<QDBusVariant>().variant();
-        m_updateMode = value.toInt();
+        m_updateMode = value.toInt(); // the mode the upgrade request wants
+    });
+}
+
+void PowerSession::queryUpdateState()
+{
+    // lastore publishes what it would install; an empty list is the only
+    // honest "nothing to do here".
+    QDBusInterface props(LASTORE_SERVICE, LASTORE_PATH,
+                         QStringLiteral("org.freedesktop.DBus.Properties"),
+                         QDBusConnection::systemBus());
+    if (!props.isValid())
+        return;
+
+    auto *watcher = new QDBusPendingCallWatcher(
+        props.asyncCall(QStringLiteral("Get"), LASTORE_INTERFACE,
+                        QStringLiteral("UpgradableApps")),
+        this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher] {
+        const QDBusPendingReply<QVariant> reply = *watcher;
+        watcher->deleteLater();
+        if (!reply.isValid())
+            return;
+        QVariant value = reply.value();
+        if (value.canConvert<QDBusVariant>())
+            value = value.value<QDBusVariant>().variant();
+        const bool pending = value.toList().size() > 0;
+        if (pending == m_updatesPending)
+            return;
+        m_updatesPending = pending;
+        rebuildOptions(); // the two power rows are worded from this
     });
 }
 
@@ -114,43 +145,51 @@ void PowerSession::refreshAvailability()
     queryCan(QStringLiteral("CanLogout"), &m_canLogout);
     queryCan(QStringLiteral("CanSuspend"), &m_canSuspend);
     queryCan(QStringLiteral("CanHibernate"), &m_canHibernate);
-    if (m_updatesAvailable)
+    if (m_updatesAvailable) {
         queryUpdateMode();
+        queryUpdateState();
+    }
 
     rebuildOptions(); // the update rows are known now; the Can* land later
 }
 
 void PowerSession::rebuildOptions()
 {
-    // Asking the session manager what it can actually do is the difference
-    // between a menu that lies and one that shows five rows on a machine that
-    // supports five. The update rows depend on the update daemon being there at
-    // all, which is a property of the installed system rather than of the
-    // session.
-    const bool updates = m_updatesAvailable;
+    // Only what this machine can do, in the order the menu wants them: the
+    // cheapest and most reversible first, the two that end the session last,
+    // and shutting down last of all because it is the slider.
+    //
+    // Updates get no rows of their own. lastore runs the upgrade and then takes
+    // the machine down itself, so "update and restart" is not a third kind of
+    // restart — it is what restart means while updates are pending, and the same
+    // goes for shutting down. Carrying the wording on the two power actions is
+    // the whole merge: four entries about going away become two.
+    const QString shutdownLabel = m_updatesPending ? tr("更新并关机") : tr("关机");
+    const QString rebootLabel = m_updatesPending ? tr("更新并重启") : tr("重启");
 
     QVariantList list;
-    list << row(QStringLiteral("shutdown"), QStringLiteral("关机"), QStringLiteral("Shut down"),
-                QStringLiteral("danger"), m_canShutdown)
-         << row(QStringLiteral("reboot"), QStringLiteral("重启"), QStringLiteral("Restart"),
-                QStringLiteral("danger"), m_canReboot)
-         << row(QStringLiteral("updateShutdown"), QStringLiteral("更新并关机"),
-                QStringLiteral("Update, then shut down"), QStringLiteral("update"), updates,
-                updates ? QString() : tr("本机未安装更新服务"))
-         << row(QStringLiteral("updateReboot"), QStringLiteral("更新并重启"),
-                QStringLiteral("Update, then restart"), QStringLiteral("update"), updates,
-                updates ? QString() : tr("本机未安装更新服务"))
-         << row(QStringLiteral("suspend"), QStringLiteral("待机"), QStringLiteral("Suspend"),
-                QStringLiteral("normal"), m_canSuspend)
-         << row(QStringLiteral("hibernate"), QStringLiteral("休眠"), QStringLiteral("Hibernate"),
-                QStringLiteral("normal"), m_canHibernate)
-         << row(QStringLiteral("logout"), QStringLiteral("注销"), QStringLiteral("Log out"),
-                QStringLiteral("danger"), m_canLogout);
-
     // Locking is meaningless while the lock is already the thing on screen.
     if (!m_lockSession || !m_lockSession->locked())
-        list << row(QStringLiteral("lock"), QStringLiteral("锁定"), QStringLiteral("Lock"),
-                    QStringLiteral("normal"), true);
+        list << row(QStringLiteral("lock"), tr("锁定"), QStringLiteral("lock"),
+                    QStringLiteral("normal"));
+    if (m_canSuspend)
+        list << row(QStringLiteral("suspend"), tr("待机"), QStringLiteral("moon"),
+                    QStringLiteral("normal"));
+    if (m_canHibernate)
+        list << row(QStringLiteral("hibernate"), tr("休眠"), QStringLiteral("snow"),
+                    QStringLiteral("normal"));
+    // Logging out is recoverable — you log back in — so it is not a hold.
+    if (m_canLogout)
+        list << row(QStringLiteral("logout"), tr("注销"), QStringLiteral("logout"),
+                    QStringLiteral("normal"));
+    // Restart is the other one that cannot be taken back, and the only button
+    // the menu makes you hold.
+    if (m_canReboot)
+        list << row(QStringLiteral("reboot"), rebootLabel, QStringLiteral("restart"),
+                    QStringLiteral("danger"));
+    if (m_canShutdown)
+        list << row(QStringLiteral("shutdown"), shutdownLabel, QStringLiteral("power"),
+                    QStringLiteral("danger"));
 
     m_options = list;
     Q_EMIT optionsChanged();
@@ -262,8 +301,11 @@ void PowerSession::restart() { show(); Q_EMIT armRequested(QStringLiteral("reboo
 void PowerSession::logout() { show(); Q_EMIT armRequested(QStringLiteral("logout")); }
 void PowerSession::suspend() { show(); Q_EMIT armRequested(QStringLiteral("suspend")); }
 void PowerSession::hibernate() { show(); Q_EMIT armRequested(QStringLiteral("hibernate")); }
-void PowerSession::updateAndShutdown() { show(); Q_EMIT armRequested(QStringLiteral("updateShutdown")); }
-void PowerSession::updateAndReboot() { show(); Q_EMIT armRequested(QStringLiteral("updateReboot")); }
+// The D-Bus surface still has these two; they open the menu on the same
+// controls as shutdown and restart, which is what those mean while updates are
+// pending anyway.
+void PowerSession::updateAndShutdown() { show(); Q_EMIT armRequested(QStringLiteral("shutdown")); }
+void PowerSession::updateAndReboot() { show(); Q_EMIT armRequested(QStringLiteral("reboot")); }
 void PowerSession::switchUser() { show(); }
 
 void PowerSession::lock()
@@ -280,22 +322,28 @@ void PowerSession::highlight(const QString &key)
 
 void PowerSession::activate(const QString &key)
 {
-    if (key == QLatin1String("shutdown"))
-        requestSessionMethod(SESSION_MGR_REQUEST_SHUTDOWN);
-    else if (key == QLatin1String("reboot"))
-        requestSessionMethod(SESSION_MGR_REQUEST_REBOOT);
-    else if (key == QLatin1String("logout"))
+    if (key == QLatin1String("shutdown")) {
+        // One power action, two meanings. While updates are pending the update
+        // daemon owns the machine and takes it down itself once the upgrade has
+        // run, so there is nothing for us to wait for.
+        if (m_updatesPending)
+            requestUpdate(true);
+        else
+            requestSessionMethod(SESSION_MGR_REQUEST_SHUTDOWN);
+    } else if (key == QLatin1String("reboot")) {
+        if (m_updatesPending)
+            requestUpdate(false);
+        else
+            requestSessionMethod(SESSION_MGR_REQUEST_REBOOT);
+    } else if (key == QLatin1String("logout")) {
         requestSessionMethod(SESSION_MGR_REQUEST_LOGOUT);
-    else if (key == QLatin1String("suspend"))
+    } else if (key == QLatin1String("suspend")) {
         requestSessionMethod(SESSION_MGR_REQUEST_SUSPEND);
-    else if (key == QLatin1String("hibernate"))
+    } else if (key == QLatin1String("hibernate")) {
         requestSessionMethod(SESSION_MGR_REQUEST_HIBERNATE);
-    else if (key == QLatin1String("updateShutdown"))
-        requestUpdate(true);
-    else if (key == QLatin1String("updateReboot"))
-        requestUpdate(false);
-    else if (key == QLatin1String("lock"))
+    } else if (key == QLatin1String("lock")) {
         lock();
-    else
+    } else {
         qWarning().noquote() << "PowerSession: unknown action" << key;
+    }
 }

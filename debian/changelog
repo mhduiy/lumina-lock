@@ -1,3 +1,43 @@
+lumina-lock (0.4.14-1) unstable; urgency=medium
+
+  * Rebuilt the power menu around what each action costs, instead of around a
+    list of eight rows that all weighed the same.
+  * Shutting down is now a slide: pull the knob to the far end and let go. The
+    screen dims as it travels, so the gesture shows its own price, and the
+    label carries the update wording ("滑动以关机" / "滑动以更新并关机").
+  * The other actions are buttons below it, each with an icon drawn as a path —
+    no SVG plugin, no system icon theme to be installed, tinted by the theme and
+    crisp at any size. Restart is the one that cannot be taken back, so it is
+    the one that counts: holding it fills a ring around the disc, letting go
+    cancels. Everything else acts on the press, because everything else can be
+    undone.
+  * Merged "update and restart" / "update and shutdown" into the two power
+    actions. lastore runs the upgrade and then takes the machine down itself, so
+    while updates are pending that is simply what restart and shut down mean —
+    four entries about going away become two.
+  * Fixed the protection being attached to the wrong actions. A single click on
+    关机 armed it and then fired by itself 1.4 s later, with no second
+    confirmation; and the armed row kept counting after the pointer moved
+    elsewhere, so the action that ran was not the one on screen. Meanwhile
+    更新并关机 (irreversible) had no protection at all and 注销 (recoverable) did.
+  * Opening the menu no longer preselects 关机. Focus starts on the first button,
+    which is 锁定 over the desktop and 待机 from the lock — a default selection is
+    a guess at intent, and the only guess worth making is the cheapest action.
+  * Actions the machine cannot perform are left out rather than greyed out: a
+    disabled button advertises something that cannot happen.
+  * The update wording now keys off lastore's UpgradableApps list rather than
+    CheckUpdateMode. The latter is a policy setting — it reads 5 on this machine
+    with nothing to install — so it said nothing about whether there was
+    anything to do.
+  * Fixed a state the menu could not come back from: when an action failed the
+    menu stayed up with its press flag still set, leaving it dimmed and ignoring
+    every key. There is now a fallback that lets the press go, the same way the
+    window-hide has one.
+  * Dropped the drifting gradient washes. Motion that carries no meaning is
+    noise, and behind a slide the dim is the thing worth watching.
+
+ -- Lumina <lumina@example.com>  Thu, 17 Sep 2026 22:20:00 +0800
+
 lumina-lock (0.4.13) unstable; urgency=medium
 
   * Added the session power menu — what dde-lock provides as
