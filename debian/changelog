@@ -1,3 +1,21 @@
+lumina-lock (0.4.26) unstable; urgency=medium
+
+  * Fixed the slide's label being drawn without antialiasing. It was built with
+    the text as the mask and the gradient bar as the source, and the glyph shape
+    then comes out of the mask: at 8x the strokes were hard-edged and had no
+    subpixel colour, next to ordinary labels that had both. The text is the
+    source now and the bar is the mask, so the glyphs are drawn as text, with
+    everything a text item gets, and the mask only modulates how bright they are.
+  * The mask carries its brightness as grey levels rather than as white with a
+    varying alpha. MultiEffect reads the mask's colour, not its alpha, so a mask
+    that is white everywhere multiplies by one everywhere and the band does
+    nothing at all — which is exactly what the first attempt at the swap did.
+  * Both inputs stay hidden. MultiEffect draws the items it is handed whether or
+    not they are visible, but it does not hide them itself: a visible source
+    draws the text twice, once plainly and once through the effect.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 13:40:00 +0800
+
 lumina-lock (0.4.25) unstable; urgency=medium
 
   * The slide's label has a highlight that sweeps across it, the way the one on

@@ -224,20 +224,24 @@ Item {
                 }
 
                 // The hint, with a highlight that sweeps across it the way the
-                // one on iOS does. It takes two pieces: a bar carrying a bright
-                // band in its gradient, and the text used as a mask — so the band
-                // is only ever visible inside the glyphs, which is the whole
-                // effect. Text has no gradient of its own in Qt Quick, and this
-                // is cheaper than a precompiled shader for one label.
+                // one on iOS does. It takes two pieces: a bar whose gradient
+                // carries the brightness — dim either side, bright in the band —
+                // and the text, which is what the light is drawn through. Text
+                // has no gradient of its own in Qt Quick, and this is cheaper
+                // than a precompiled shader for one label.
+                //
+                // The text is the *source* and the bar is the mask, not the
+                // other way round. The other way round works too, and that is
+                // how it was first written, but the glyph shape then comes out
+                // of the mask's alpha channel and loses its antialiasing: at 8x
+                // the strokes were hard-edged and had no subpixel colour, next to
+                // ordinary labels that had both. As the source the glyphs are
+                // drawn as text, with everything a text item gets, and the mask
+                // only modulates how bright they are.
                 //
                 // The band moves by animating the gradient's stop positions
                 // rather than by moving the bar: the stops are relative to the
-                // bar's bounds, so nothing has to stay aligned with the mask.
-                //
-                // The mask is the text, hidden and layered, which is how
-                // MultiEffect takes one — and unlike a rounded Rectangle in a
-                // layer, a text item keeps its antialiasing there, because glyphs
-                // are drawn into a texture with their coverage intact.
+                // bar's bounds, so nothing has to stay aligned with the text.
                 Item {
                     id: hintLabel
                     anchors.centerIn: parent
@@ -262,30 +266,39 @@ Item {
                     Text {
                         id: hintText
                         text: qsTr("滑动以") + root.shutdown.label
+                        // Full white: the dimming and the highlight are the
+                        // mask's job now.
                         color: Theme.textPrimary
                         font.family: Theme.fontFamily
                         font.pixelSize: 15 * root.unit
                         font.letterSpacing: 1.5 * root.unit
+                        // Hidden like the mask: MultiEffect draws the items it
+                        // is given whether or not they are visible, but it does
+                        // not hide them itself — leaving this visible draws the
+                        // text twice, once plainly and once through the effect.
                         visible: false
-                        layer.enabled: true
                     }
 
                     Rectangle {
                         id: sheen
                         anchors.fill: parent
                         visible: false
+                        layer.enabled: true
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
-                            // Dim either side of the band and bright inside it,
-                            // with the bright part held flat across the middle: a
-                            // single peak with ramps either side is a gloss you
-                            // have to be told about, a plateau is a band you can
-                            // see. The base is a little under white on purpose —
-                            // a highlight needs something to stand out from.
-                            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.66) }
+                            // The brightness the light is drawn through, as
+                            // grey levels rather than as white with varying
+                            // alpha: MultiEffect reads the mask's *colour*, not
+                            // its alpha, so a mask that is white everywhere
+                            // multiplies by one everywhere and the band does
+                            // nothing at all. Dim either side, full white inside
+                            // the band, held flat across the middle — a single
+                            // peak with ramps either side is a gloss you have to
+                            // be told about, a plateau is a band you can see.
+                            GradientStop { position: 0.0; color: "#A8A8A8" }
                             GradientStop {
                                 position: Math.max(0.0, hintLabel.sweep - 0.20)
-                                color: Qt.rgba(1, 1, 1, 0.66)
+                                color: "#A8A8A8"
                             }
                             GradientStop {
                                 position: Math.max(0.0, hintLabel.sweep - 0.05)
@@ -297,19 +310,19 @@ Item {
                             }
                             GradientStop {
                                 position: Math.min(1.0, hintLabel.sweep + 0.20)
-                                color: Qt.rgba(1, 1, 1, 0.66)
+                                color: "#A8A8A8"
                             }
-                            GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.66) }
+                            GradientStop { position: 1.0; color: "#A8A8A8" }
                         }
                     }
 
                     MultiEffect {
                         anchors.fill: parent
-                        source: sheen
-                        maskSource: hintText
+                        source: hintText
+                        maskSource: sheen
                         maskEnabled: true
                         // A soft mask range: the defaults are a hard threshold,
-                        // which would step the glyph edges.
+                        // which would step the band's edges.
                         maskThresholdMin: 0.0
                         maskThresholdMax: 1.0
                     }
