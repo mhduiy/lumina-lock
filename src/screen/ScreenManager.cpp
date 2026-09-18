@@ -186,12 +186,24 @@ void ScreenManager::showPowerMenu()
 
 void ScreenManager::hidePowerMenu()
 {
+    // Give the keyboard back to the lock before taking the menu away. The menu
+    // took the grab when it opened and the lock is still up behind it, and the
+    // lock's windows are unmanaged — the grab is the only way they ever see a
+    // keystroke — so leaving it unheld means the password field silently stops
+    // accepting input the moment the menu is dismissed.
     m_grabInput = false;
+    applyKeyboardGrab(); // releases on the power window, which still holds it
+    m_grabWindow = nullptr;
+    chooseGrabWindow(); // one of the lock's own windows again
+    m_grabInput = m_visible;
     applyKeyboardGrab();
-    m_grabWindow = nullptr; // next lock re-picks one of its own windows
+
     if (m_powerWindow)
         m_powerWindow->hide();
-    qWarning() << "ScreenManager: hidePowerMenu";
+    qWarning().nospace() << "ScreenManager: hidePowerMenu visible=" << m_visible
+                         << " grabWindow="
+                         << (m_grabWindow ? m_grabWindow->title() : QStringLiteral("none"))
+                         << " grabbed=" << m_grabInput;
 }
 
 void ScreenManager::hideAll()

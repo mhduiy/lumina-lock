@@ -1,3 +1,21 @@
+lumina-lock (0.4.24) unstable; urgency=medium
+
+  * Fixed the password field going deaf after dismissing the power menu with
+    Escape. hidePowerMenu released the grab and set the grab window to null,
+    expecting the next lock to pick one of its own again — but the lock is still
+    up behind the menu, and its windows are unmanaged, so the grab is the only
+    way they ever see a keystroke. Nothing held it, and the field silently
+    stopped accepting input. It hands the keyboard back to the lock's window
+    before the menu is hidden now. Verified: hidePowerMenu logs
+    grabWindow="Lumina Lock" grabbed=true, and typing after Escape changes 332
+    pixels inside the field.
+  * The corner controls follow the field on a beat: they start 300 ms after the
+    password screen does, so the field lands first and they trail it, rather than
+    three things moving at once. Measured from a recording: nothing yet at
+    +200 ms, fully in by +750 ms (the 300 ms beat plus the 420 ms rise).
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 12:05:00 +0800
+
 lumina-lock (0.4.23) unstable; urgency=medium
 
   * Fixed Escape doing nothing to the power menu when it was opened from the

@@ -323,13 +323,15 @@ Window {
                 Behavior on border.color { ColorAnimation { duration: 160 } }
                 MotionBehavior on scale { duration: 160 }
 
-                // The tail. Not together, and not one after the other either:
-                // a short offset between them so they read as one gesture with
-                // something trailing, which is what makes it a whip rather than
-                // a pair or a queue.
+                // The tail, on a beat. The field lands first — it has its own
+                // 320 ms reveal — and these follow a third of a second later, so
+                // the screen has one thing arriving and then something trailing
+                // it, rather than three things moving at once. The 55 ms between
+                // the two is what makes it a whip: not together, and not one
+                // after the other either.
                 property real entrance: 0
                 Timer {
-                    interval: control.index * 55
+                    interval: 300 + control.index * 55
                     running: content.state !== "Idle"
                     onTriggered: popIn.restart()
                 }
