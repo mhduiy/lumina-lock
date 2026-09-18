@@ -47,6 +47,14 @@
 // has run. It lives on the system bus. The 6.x generation renamed it along with
 // everything else — com.deepin.lastore does not exist there, so asking for it
 // silently answers "no update daemon" and the two rows never light up.
+// Switching users belongs to the display manager, not to the lock: the standard
+// interface hands the seat to the greeter, and the greeter is where the user
+// list lives. There is no user list inside the lock, so both "show the user
+// list" and "switch user" mean this.
+#define DISPLAY_MANAGER_SERVICE        QStringLiteral("org.freedesktop.DisplayManager")
+#define DISPLAY_MANAGER_SEAT_PATH      QStringLiteral("/org/freedesktop/DisplayManager/Seat0")
+#define DISPLAY_MANAGER_SEAT_INTERFACE QStringLiteral("org.freedesktop.DisplayManager.Seat")
+
 #define LASTORE_SERVICE   QStringLiteral("org.deepin.dde.Lastore1")
 #define LASTORE_PATH      QStringLiteral("/org/deepin/dde/Lastore1")
 #define LASTORE_INTERFACE QStringLiteral("org.deepin.dde.Lastore1.Manager")

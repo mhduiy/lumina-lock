@@ -267,6 +267,71 @@ Window {
         }
     }
 
+    // --- Session controls (bottom right) ---
+    // Two things have to be reachable without unlocking: shutting the machine
+    // down, and handing the seat to someone else. They sit in the bottom-right
+    // corner because that is where session controls are looked for, because the
+    // corners are the only part of this layout nothing else wants — the clock and
+    // the password panel are both centred — and because the scrim already
+    // darkens the bottom of the screen, so they stay legible over any wallpaper.
+    // They share their line with the unlock hint.
+    //
+    // Declared after the wake area so that a click here is a click on the
+    // control and not a wake-up.
+    Row {
+        id: sessionControls
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: root.height * 0.045
+        anchors.bottomMargin: root.height * 0.045
+        spacing: 14 * root.u
+        z: 10
+
+        Repeater {
+            model: [
+                { action: "switchUser", icon: "user" },
+                { action: "power", icon: "power" }
+            ]
+
+            delegate: Rectangle {
+                id: control
+                required property var modelData
+
+                width: 36 * root.u
+                height: width
+                radius: width / 2
+                antialiasing: true
+                color: hover.hovered ? Qt.rgba(1, 1, 1, 0.18) : Theme.surface
+                border.width: 1 * root.u
+                border.color: hover.hovered ? Theme.surfaceBorderFocus : Theme.controlBorder
+                // ColorAnimation, not MotionBehavior: that one is a
+                // NumberAnimation and would interpolate a color as a number,
+                // which lands on black.
+                Behavior on color { ColorAnimation { duration: 160 } }
+                Behavior on border.color { ColorAnimation { duration: 160 } }
+
+                PowerIcon {
+                    anchors.centerIn: parent
+                    name: control.modelData.icon
+                    size: 22 * root.u
+                    color: Theme.textPrimary
+                }
+
+                MouseArea {
+                    id: hover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                        if (control.modelData.action === "power")
+                            Power.show()
+                        else
+                            Power.switchUser()
+                    }
+                }
+            }
+        }
+    }
+
     // --- Keyboard wake ---
     // There is no key handler here on purpose. The X11 grab delivers every
     // keystroke to the one window that holds it, so the decision of *which*

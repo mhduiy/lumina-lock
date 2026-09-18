@@ -27,6 +27,8 @@ Item {
         moon:    { path: "M20.4 14.8A8.6 8.6 0 0 1 9.2 3.6A8.6 8.6 0 1 0 20.4 14.8Z", fill: true },
         snow:    { path: "M12 3.4V20.6 M4.6 7.7L19.4 16.3 M19.4 7.7L4.6 16.3", fill: false },
         update:  { path: "M12 3.8V14.4 M7.4 9.9L12 14.4L16.6 9.9 M4.6 19.6h14.8", fill: false },
+        user:    { path: "M12 11.4a3.8 3.8 0 1 0 0-7.6a3.8 3.8 0 0 0 0 7.6Z M5.2 20.4a6.8 6.8 0 0 1 13.6 0",
+                   fill: false },
         // The arrow leaves the door rather than entering it: this is logging
         // out, and an arrow pointing into the frame reads as logging in.
         logout:  { path: "M9.4 4.4h-4.2A1.4 1.4 0 0 0 3.8 5.8v12.4a1.4 1.4 0 0 0 1.4 1.4h4.2 M9.6 12h10 M15.8 8.4L19.4 12L15.8 15.6",

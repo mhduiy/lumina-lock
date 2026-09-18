@@ -1,3 +1,24 @@
+lumina-lock (0.4.22) unstable; urgency=medium
+
+  * The lock screen has two session controls in the bottom-right corner: switch
+    user, then power, which opens the power menu. They are reachable without
+    unlocking, because shutting the machine down should not require logging in
+    first, and they sit in the corner because that is where session controls are
+    looked for, because the corners are the only part of this layout nothing else
+    wants — the clock and the password panel are both centred — and because the
+    scrim already darkens the bottom of the screen, so they stay legible over any
+    wallpaper.
+  * Switch user now does something. LockSession::showUserList() was a stub that
+    just locked the screen; the user list lives in the greeter, not in the lock,
+    so it hands the seat over through the standard interface
+    (org.freedesktop.DisplayManager.Seat.SwitchToGreeter), which is also where
+    dde-lock's own "switch user" ends up. PowerSession::switchUser() forwards to
+    it, so the D-Bus SwitchUser and the button are one implementation.
+  * PowerSession::show() and switchUser() are Q_INVOKABLE now: a plain public
+    method is not reachable from QML, and the lock screen's buttons call them.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 11:35:00 +0800
+
 lumina-lock (0.4.21) unstable; urgency=medium
 
   * The power menu's buttons and its slider track have a surface you can see.

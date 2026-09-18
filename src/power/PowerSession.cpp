@@ -313,7 +313,14 @@ void PowerSession::suspend() { show(); Q_EMIT armRequested(QStringLiteral("suspe
 void PowerSession::hibernate() { show(); Q_EMIT armRequested(QStringLiteral("hibernate")); }
 void PowerSession::updateAndShutdown() { show(); Q_EMIT armRequested(QStringLiteral("updateShutdown")); }
 void PowerSession::updateAndReboot() { show(); Q_EMIT armRequested(QStringLiteral("updateReboot")); }
-void PowerSession::switchUser() { show(); }
+// One implementation for both entry points: the lock screen's button and the
+// D-Bus SwitchUser land in LockSession, which is the object that knows about the
+// session rather than about this menu.
+void PowerSession::switchUser()
+{
+    if (m_lockSession)
+        m_lockSession->showUserList();
+}
 
 void PowerSession::lock()
 {

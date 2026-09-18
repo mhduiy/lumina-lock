@@ -144,9 +144,23 @@ void LockSession::show()
 
 void LockSession::showUserList()
 {
-    // No multi-user switcher in this lock: showing the lock itself is the safe
-    // fallback so the screen is never left uncovered.
-    lock();
+    // The user list lives in the greeter, not in the lock: the standard
+    // interface hands the seat over to it, which is where a person picks another
+    // account. This is also where dde-lock's own "switch user" ends up, so the
+    // D-Bus surface keeps meaning what it meant.
+    if (qEnvironmentVariableIsSet("LUMINA_POWER_DRY_RUN")) {
+        qWarning() << "LockSession: dry run, would switch to the greeter";
+        return;
+    }
+
+    QDBusInterface seat(DISPLAY_MANAGER_SERVICE, DISPLAY_MANAGER_SEAT_PATH,
+                        DISPLAY_MANAGER_SEAT_INTERFACE, QDBusConnection::systemBus());
+    if (seat.isValid() == false) {
+        qWarning() << "LockSession:" << DISPLAY_MANAGER_SERVICE
+                   << "has no seat; cannot switch user";
+        return;
+    }
+    seat.asyncCall(QStringLiteral("SwitchToGreeter"));
 }
 
 void LockSession::showAuth(bool active)

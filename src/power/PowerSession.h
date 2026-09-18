@@ -33,14 +33,19 @@ public:
     // --- the dde-lock surface (org.deepin.dde.ShutdownFront1) ---------------
     // Each of these opens the menu with its row armed, so a request that came
     // from elsewhere still gives the person at the machine a beat to cancel.
-    void show();
+    //
+    // These two are Q_INVOKABLE because the lock screen's own corner buttons
+    // call them: a plain public method is not reachable from QML. The D-Bus
+    // adaptor is unaffected — it declares its own slots and forwards here.
+    Q_INVOKABLE void show();
     void shutdown();
     void restart();
     void logout();
     void suspend();
     void hibernate();
     void lock();
-    void switchUser();
+    // Switching users does not open this menu: it hands the seat to the greeter.
+    Q_INVOKABLE void switchUser();
     void updateAndShutdown();
     void updateAndReboot();
 
