@@ -123,10 +123,16 @@ Item {
     // What the slide pulls down. The darker it gets, the closer the machine is
     // to going away — this is the whole confirmation, so it is tied to the
     // knob's travel and to nothing else.
+    //
+    // It has to reach 1.0, not 1.0 minus the base: the base is translucent, so
+    // its 0.62 leaves 38% of the desktop showing through, and an overlay that
+    // stopped at 0.38 would still leave 24% of it — a dimmed desktop, not the
+    // darkest the screen goes. Pulling the knob all the way is the end of the
+    // range.
     Rectangle {
         anchors.fill: parent
         color: "black"
-        opacity: slider.progress * 0.35
+        opacity: slider.progress
     }
 
     // --- content ------------------------------------------------------------
@@ -204,7 +210,11 @@ Item {
                     width: slider.inset + slider.knobSize + slider.travel * slider.progress
                     radius: height / 2
                     antialiasing: true
-                    color: Qt.rgba(0.56, 0.66, 0.94, 0.08 + 0.26 * slider.progress)
+                    // Shutting down is the one action that cannot be taken
+                    // back, so its control carries the danger colour rather
+                    // than the accent every other control uses.
+                    color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b,
+                                   0.10 + 0.30 * slider.progress)
                 }
 
                 Text {
@@ -213,7 +223,7 @@ Item {
                     // with nothing to install, "更新并关机" when lastore has
                     // something to run first.
                     text: qsTr("滑动以") + root.shutdown.label
-                    color: Theme.textSecondary
+                    color: Qt.rgba(1, 1, 1, 0.80)
                     font.family: Theme.fontFamily
                     font.pixelSize: 15 * root.unit
                     font.letterSpacing: 1.5 * root.unit
@@ -232,7 +242,7 @@ Item {
                     antialiasing: true
                     color: Qt.rgba(1, 1, 1, 0.10 + 0.10 * slider.progress)
                     border.width: 1 * root.unit
-                    border.color: slider.progress > 0.02 ? Theme.accent : Theme.surfaceBorder
+                    border.color: slider.progress > 0.02 ? Theme.error : Theme.surfaceBorder
 
                     PowerIcon {
                         anchors.centerIn: parent
@@ -337,11 +347,14 @@ Item {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 text: qsTr("↑↓ 切换    ←→ 选择    按住确认    Esc 取消")
-                color: Theme.textTertiary
+                // Not textTertiary: that is 38% white, and it used to be
+                // multiplied by another 0.7 on top, which left the hint at 27%
+                // — unreadable against a backdrop this dark, which is what it
+                // looked like: black text on a black screen.
+                color: Qt.rgba(1, 1, 1, 0.62)
                 font.family: Theme.fontFamily
                 font.pixelSize: 11 * root.unit
                 font.letterSpacing: 1 * root.unit
-                opacity: 0.7
             }
         }
     }
@@ -597,7 +610,9 @@ Item {
                 preferredRendererType: Shape.CurveRenderer
 
                 ShapePath {
-                    strokeColor: Theme.accent
+                    // Every button that gets a ring is one that cannot be taken
+                    // back, so the ring is the danger colour too.
+                    strokeColor: Theme.error
                     strokeWidth: 2.4 * root.unit
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
@@ -617,7 +632,7 @@ Item {
                 anchors.topMargin: 7 * root.unit
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: button.modelData.label
-                color: button.selected ? Theme.textPrimary : Theme.textSecondary
+                color: button.selected ? Theme.textPrimary : Qt.rgba(1, 1, 1, 0.78)
                 font.family: Theme.fontFamily
                 font.pixelSize: 12 * root.unit
                 MotionBehavior on color { duration: 200 }

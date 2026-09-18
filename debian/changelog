@@ -1,3 +1,22 @@
+lumina-lock (0.4.17) unstable; urgency=medium
+
+  * The slide now reaches the darkest the screen goes. The overlay tops out at
+    1.0 instead of 0.38: the base is translucent, so its 0.62 already leaves 38%
+    of the desktop showing, and the old ceiling still let 24% of it through —
+    a dimmed desktop rather than the end of the range. Measured on the backdrop:
+    (3,5,9) at rest, (1,2,4) halfway, (0,0,0) with the knob all the way over.
+  * Shutting down carries the danger colour. The slider's fill and its knob's
+    border are red now, as is the ring that counts down a held button — the
+    actions that cannot be taken back are the red ones, and shutting down no
+    longer wears the same accent as everything else.
+  * Fixed the help line being unreadable. It was textTertiary — 38% white — and
+    then multiplied by another 0.7, which left it at 27%: against a backdrop
+    this dark it read exactly as it looked, black text on a black screen. It is
+    62% white with no second reduction, and the button labels went from 62% to
+    78%.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 10:05:00 +0800
+
 lumina-lock (0.4.16) unstable; urgency=medium
 
   * Version carries no Debian revision: 0.4.15-1 and 0.4.14-1 were a slip.
