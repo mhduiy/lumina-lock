@@ -324,6 +324,15 @@ bool ScreenManager::eventFilter(QObject *watched, QEvent *event)
     if (event->type() != QEvent::KeyPress || !m_visible || !m_interactive)
         return QObject::eventFilter(watched, event);
 
+    // The power menu owns the keyboard while it is up: it holds the grab and its
+    // own item has the focus, and its keys are its own — Escape closes it. The
+    // routing below would take them instead, because with no screen picked for
+    // authentication yet (the idle lock) the target is never the auth screen, so
+    // every key was consumed as "wake this screen up" and Escape reached the
+    // lock rather than the menu. That left the menu with no keyboard way out.
+    if (m_powerWindow && m_powerWindow->isVisible())
+        return QObject::eventFilter(watched, event);
+
     auto *keyEvent = static_cast<QKeyEvent *>(event);
 
     // The X11 keyboard grab delivers every keystroke to a single window — the

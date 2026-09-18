@@ -274,7 +274,10 @@ Window {
     // corners are the only part of this layout nothing else wants — the clock and
     // the password panel are both centred — and because the scrim already
     // darkens the bottom of the screen, so they stay legible over any wallpaper.
-    // They share their line with the unlock hint.
+    //
+    // They belong to the password screen, not to the idle lock: idle is the
+    // wallpaper and the clock, and nothing else. So they pop up when the field
+    // does and drop away with it.
     //
     // Declared after the wake area so that a click here is a click on the
     // control and not a wake-up.
@@ -295,20 +298,59 @@ Window {
 
             delegate: Rectangle {
                 id: control
+                required property int index
                 required property var modelData
 
                 width: 36 * root.u
                 height: width
                 radius: width / 2
                 antialiasing: true
-                color: hover.hovered ? Qt.rgba(1, 1, 1, 0.18) : Theme.surface
+                // Visible only while it is arriving or arrived: an invisible
+                // control that still takes clicks is worse than no control.
+                visible: control.entrance > 0.001
+                opacity: control.entrance
+                color: hover.hovered ? Qt.rgba(1, 1, 1, 0.26) : Theme.surface
                 border.width: 1 * root.u
                 border.color: hover.hovered ? Theme.surfaceBorderFocus : Theme.controlBorder
+                scale: hover.hovered ? 1.08 : 1
+                transform: Translate { y: (1 - control.entrance) * 26 * root.u }
+
                 // ColorAnimation, not MotionBehavior: that one is a
                 // NumberAnimation and would interpolate a color as a number,
-                // which lands on black.
+                // which lands on black. Scale is a number, so the shared
+                // transition is fine there.
                 Behavior on color { ColorAnimation { duration: 160 } }
                 Behavior on border.color { ColorAnimation { duration: 160 } }
+                MotionBehavior on scale { duration: 160 }
+
+                // The tail. Not together, and not one after the other either:
+                // a short offset between them so they read as one gesture with
+                // something trailing, which is what makes it a whip rather than
+                // a pair or a queue.
+                property real entrance: 0
+                Timer {
+                    interval: control.index * 55
+                    running: content.state !== "Idle"
+                    onTriggered: popIn.restart()
+                }
+                Connections {
+                    target: content
+                    function onStateChanged() {
+                        if (content.state === "Idle")
+                            control.entrance = 0
+                    }
+                }
+                NumberAnimation {
+                    id: popIn
+                    target: control
+                    property: "entrance"
+                    from: 0
+                    to: 1
+                    duration: 420
+                    // Overshoot: it rises past where it belongs and settles back
+                    // into it, which is what makes it pop up rather than slide.
+                    easing.type: Easing.OutBack
+                }
 
                 PowerIcon {
                     anchors.centerIn: parent

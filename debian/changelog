@@ -1,3 +1,26 @@
+lumina-lock (0.4.23) unstable; urgency=medium
+
+  * Fixed Escape doing nothing to the power menu when it was opened from the
+    lock screen. Key routing happens in ScreenManager::eventFilter, which runs
+    before the focused item sees anything: with no screen picked for
+    authentication yet — the idle lock — the screen under the pointer is never
+    the auth screen, so every keystroke was consumed as "wake this screen up".
+    Escape went to the lock and the menu had no keyboard way out. The filter now
+    stands aside while the power menu is up, because the menu holds the grab and
+    its own item has the focus.
+  * The lock screen's session controls belong to the password screen rather than
+    to the idle lock, and they arrive with a tail: a 55 ms offset between the two
+    so they read as one gesture with something trailing, and an OutBack curve so
+    they rise past where they belong and settle back into it. Frames from a
+    screen recording show the second button still low while the first is up, and
+    both aligned once settled.
+  * Hovering one of them is visible now: the fill goes to 26% white, the rim to
+    the focus value, and the disc grows by 8%. An invisible control that still
+    takes clicks would be worse than no control, so they are only there when the
+    password field is.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 11:50:00 +0800
+
 lumina-lock (0.4.22) unstable; urgency=medium
 
   * The lock screen has two session controls in the bottom-right corner: switch
