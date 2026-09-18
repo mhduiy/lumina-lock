@@ -37,6 +37,7 @@ public:
     Q_INVOKABLE void setVideo(const QUrl &url, const QUrl &poster = QUrl());
     Q_INVOKABLE void clear();
 
+
 signals:
     void wallpaperChanged();
 

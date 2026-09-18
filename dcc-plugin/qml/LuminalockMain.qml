@@ -26,6 +26,16 @@ DccObject {
     readonly property var weightLabels: weightOptions.map(option => option.label)
     readonly property var weightValues: weightOptions.map(option => option.value)
 
+    // 壁纸类型：显示文案与 DConfig 取值一一对应。
+    readonly property var typeValues: ["none", "static", "video", "video-random"]
+    readonly property var typeLabels: [qsTr("默认壁纸"), qsTr("静态图片"), qsTr("动态视频"),
+                                       qsTr("动态视频（随机）")]
+
+    function typeIndex(value) {
+        const index = typeValues.indexOf(value)
+        return index < 0 ? 0 : index
+    }
+
     function saveFile(kind, url) {
         selectionError = dccData.setFile(kind, url) ? ""
             : qsTr("无法保存壁纸，请检查文件是否可读，以及壁纸配置是否已正确安装。")
@@ -35,17 +45,26 @@ DccObject {
         name: "type"
         parentName: "luminalock"
         displayName: qsTr("壁纸类型")
-        description: qsTr("锁屏背景使用内置壁纸、静态图片还是动态视频")
+        description: qsTr("锁屏背景使用内置壁纸、静态图片、单个动态视频，还是每次上锁从视频列表里随机播放一个")
         weight: 10
         backgroundType: DccObject.Normal
         pageType: DccObject.Editor
         page: D.ComboBox {
+            id: typeCombo
             flat: true
-            model: [qsTr("默认壁纸"), qsTr("静态图片"), qsTr("动态视频")]
-            currentIndex: dccData.wallpaperType === "video" ? 2
-                        : (dccData.wallpaperType === "static" ? 1 : 0)
-            onActivated: index => dccData.setType(index === 2 ? "video"
-                                                    : (index === 1 ? "static" : "none"))
+            model: root.typeLabels
+            currentIndex: root.typeIndex(dccData.wallpaperType)
+            onActivated: index => dccData.setType(root.typeValues[index])
+
+            // 下拉自己写入 currentIndex 时会打断上面的绑定，而"随机视频列表"里加
+            // 视频同样会把类型切成 video-random——不重新同步的话，下拉会显示一个
+            // 和锁屏实际行为不一致的旧值。
+            Connections {
+                target: dccData
+                function onWallpaperTypeChanged() {
+                    typeCombo.currentIndex = root.typeIndex(dccData.wallpaperType)
+                }
+            }
         }
     }
 
@@ -96,6 +115,31 @@ DccObject {
     }
 
     DccObject {
+        name: "videoPool"
+        parentName: "luminalock"
+        displayName: qsTr("随机视频列表")
+        description: dccData.videoPaths.length === 0
+                     ? qsTr("未设置")
+                     : qsTr("%1 个视频").arg(dccData.videoPaths.length)
+        weight: 35
+        backgroundType: DccObject.Normal
+        pageType: DccObject.Editor
+        page: Button {
+            text: qsTr("管理")
+            onClicked: videoListLoader.active = true
+
+            // 弹窗按需创建、关掉即销毁，和别的插件的对话框一致。
+            Loader {
+                id: videoListLoader
+                active: false
+                sourceComponent: VideoListDialog {
+                    onClosing: videoListLoader.active = false
+                }
+            }
+        }
+    }
+
+    DccObject {
         name: "poster"
         parentName: "luminalock"
         displayName: qsTr("视频封面")
@@ -114,6 +158,40 @@ DccObject {
                 nameFilters: ["Images (*.jpg *.jpeg *.png *.bmp *.gif *.webp)"]
                 onAccepted: root.saveFile("poster", selectedFile)
             }
+        }
+    }
+
+    DccObject {
+        name: "clockPositionX"
+        parentName: "luminalock"
+        displayName: qsTr("时间日期横向位置")
+        description: qsTr("0 = 贴左边缘，50 = 居中（默认），100 = 贴右边缘")
+        weight: 52
+        backgroundType: DccObject.Normal
+        pageType: DccObject.Editor
+        page: D.SpinBox {
+            from: 0
+            to: 100
+            editable: true
+            value: dccData.clockPositionX
+            onValueChanged: dccData.setClockPositionX(value)
+        }
+    }
+
+    DccObject {
+        name: "clockPositionY"
+        parentName: "luminalock"
+        displayName: qsTr("时间日期纵向位置")
+        description: qsTr("0 = 贴上边缘，50 = 居中（默认），100 = 贴下边缘")
+        weight: 54
+        backgroundType: DccObject.Normal
+        pageType: DccObject.Editor
+        page: D.SpinBox {
+            from: 0
+            to: 100
+            editable: true
+            value: dccData.clockPositionY
+            onValueChanged: dccData.setClockPositionY(value)
         }
     }
 
@@ -192,7 +270,7 @@ DccObject {
         name: "reset"
         parentName: "luminalock"
         displayName: qsTr("恢复默认")
-        description: qsTr("清空壁纸设置并回到默认字号与字重")
+        description: qsTr("清空壁纸设置（含随机视频列表）并回到默认字号、字重与时间日期位置")
         weight: 80
         backgroundType: DccObject.Normal
         pageType: DccObject.Editor

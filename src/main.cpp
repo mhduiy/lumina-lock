@@ -88,6 +88,9 @@ int main(int argc, char *argv[])
     WallpaperManager wallpaper;
     WallpaperConfig wallpaperConfig; // DConfig-backed settings (control-center)
     AppearanceConfig appearanceConfig;
+    // With a wallpaper named on the command line the lock is pinned to it and
+    // DConfig is not consulted at all — including the random video pool.
+    const bool wallpaperFromCli = parser.isSet(videoOpt) || parser.isSet(wallpaperOpt);
     if (parser.isSet(videoOpt)) {
         wallpaper.setVideo(QUrl::fromLocalFile(parser.value(videoOpt)),
                            parser.isSet(posterOpt)
@@ -159,11 +162,18 @@ int main(int argc, char *argv[])
     screens.setPowerUrl(QUrl(QStringLiteral("qrc:/qml/PowerWindow.qml")));
 
     // Resident service: unlocking hides the surfaces, locking shows them again.
-    QObject::connect(&session, &LockSession::lockedChanged, &app, [&screens](bool locked) {
-        if (locked)
-            screens.showAll();
-        else
+    // A new lock is also a new draw from the random video pool, so the wallpaper
+    // is chosen *before* the surfaces come up and the fade-in shows the video
+    // this lock actually got.
+    QObject::connect(&session, &LockSession::lockedChanged, &app,
+                     [&screens, &wallpaperConfig, &wallpaper, wallpaperFromCli](bool locked) {
+        if (!locked) {
             screens.hideAll();
+            return;
+        }
+        if (!wallpaperFromCli)
+            wallpaperConfig.pickForNewLock(wallpaper);
+        screens.showAll();
     });
 
 #ifdef __GLIBC__
