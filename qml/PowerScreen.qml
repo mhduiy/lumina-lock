@@ -210,12 +210,11 @@ Item {
                     width: slider.inset + slider.knobSize + slider.travel * slider.progress
                     radius: height / 2
                     antialiasing: true
-                    // Shutting down is the one action that cannot be taken
-                    // back, so its control carries the danger colour rather
-                    // than the accent every other control uses — and it is
-                    // driven by the drag, not worn at rest. The fill sits under
-                    // the knob, so painting it at rest put a red disc behind
-                    // the knob and read as a stain rather than as emphasis.
+                    // The fill is the travel indicator, not the control's
+                    // colour: it is the same red as the knob so the two read as
+                    // one thing, and it is invisible until the knob moves — a
+                    // fill painted at rest would sit behind the knob and look
+                    // like a stain on it.
                     color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b,
                                    0.34 * slider.progress)
                 }
@@ -243,15 +242,21 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     radius: width / 2
                     antialiasing: true
-                    color: Qt.rgba(1, 1, 1, 0.10 + 0.10 * slider.progress)
+                    // The knob wears the danger colour from the start. Which
+                    // action this is should not have to be discovered by pulling
+                    // it, and shutting down is the one that cannot be taken back
+                    // — so the control is red at rest and deepens as it travels.
+                    color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b,
+                                   0.20 + 0.22 * slider.progress)
                     border.width: 1 * root.unit
-                    border.color: slider.progress > 0.02 ? Theme.error : Theme.surfaceBorder
+                    border.color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b,
+                                          0.62 + 0.38 * slider.progress)
 
                     PowerIcon {
                         anchors.centerIn: parent
                         name: "power"
                         size: 26 * root.unit
-                        color: slider.progress > 0.02 ? Theme.textPrimary : Theme.textSecondary
+                        color: Qt.rgba(1, 1, 1, 0.88 + 0.12 * slider.progress)
                     }
                 }
 
