@@ -1,3 +1,17 @@
+lumina-lock (0.4.21) unstable; urgency=medium
+
+  * The power menu's buttons and its slider track have a surface you can see.
+    They were drawn as a 6% white film, which against a backdrop this dark read
+    as nothing at all — an outline with nothing inside it. Theme.surface is 12%
+    now; the power menu is its only consumer, so nothing else moves.
+  * A filled control gets a rim of its own (Theme.controlBorder, 22%) instead of
+    the hairline the lock screen uses. At 0.14 the rim is the same value as the
+    fill and the edge it is there to draw disappears. Measured against the
+    backdrop: a disc reads (34,35,39) where it was barely distinguishable from
+    (3,5,9).
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 11:10:00 +0800
+
 lumina-lock (0.4.20) unstable; urgency=medium
 
   * Fixed the button labels and icons going black when the pointer moved over

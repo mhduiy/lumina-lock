@@ -196,9 +196,9 @@ Item {
                     anchors.fill: parent
                     radius: height / 2
                     antialiasing: true
-                    color: Qt.rgba(1, 1, 1, 0.055)
+                    color: Theme.surface
                     border.width: 1 * root.unit
-                    border.color: slider.focused ? Theme.surfaceBorderFocus : Theme.surfaceBorder
+                    border.color: slider.focused ? Theme.surfaceBorderFocus : Theme.controlBorder
                     // ColorAnimation, not MotionBehavior: that one is a
                     // NumberAnimation, and pointing it at a color interpolates
                     // the value as a number — which lands on 0, i.e. black.
@@ -598,7 +598,7 @@ Item {
                 antialiasing: true
                 color: Theme.surface
                 border.width: 1 * root.unit
-                border.color: button.selected ? Theme.surfaceBorderFocus : Theme.surfaceBorder
+                border.color: button.selected ? Theme.surfaceBorderFocus : Theme.controlBorder
                 scale: button.selected ? 1.06 : 1
                 Behavior on border.color { ColorAnimation { duration: 200 } }
                 MotionBehavior on scale { duration: 200 }

@@ -11,9 +11,16 @@ QtObject {
     readonly property color accent: "#8FA9F0"
     readonly property color error: "#FF6B6B"
 
-    readonly property color surface: Qt.rgba(1, 1, 1, 0.06)
+    // A control you are aiming at has to read as a surface, not as a film of
+    // light over whatever is behind it: 6% white looked like nothing at all
+    // against a backdrop this dark. Used by the power menu's buttons and its
+    // slider track.
+    readonly property color surface: Qt.rgba(1, 1, 1, 0.12)
     readonly property color surfaceBorder: Qt.rgba(1, 1, 1, 0.14)
     readonly property color surfaceBorderFocus: Qt.rgba(1, 1, 1, 0.34)
+    // The rim of a filled control. Brighter than surfaceBorder on purpose: at
+    // 0.14 it is the same value as the fill and the edge disappears.
+    readonly property color controlBorder: Qt.rgba(1, 1, 1, 0.22)
 
     // Frosted glass: a faint lift plus a hairline, laid over a blurred sample
     // of the wallpaper (see components/GlassPanel.qml).
