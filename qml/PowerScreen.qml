@@ -47,22 +47,38 @@ Item {
     readonly property int holdDuration: 900
     readonly property int slideDuration: 1100
 
-    // Shutdown is the slider, so it is not in the row. Everything the machine
+    // Shutdown is the slider, so it is not in a row. Everything the machine
     // cannot do is already absent — the backend leaves those out rather than
     // handing over a disabled entry to draw.
+    //
+    // The rest is split by what the action costs: everything that can be taken
+    // back in one row, everything that cannot in another, with a rule between
+    // them. `flat` is the position across both rows, which is what the selection
+    // moves through, so walking past the end of one row carries on into the next.
     readonly property var split: {
-        const buttons = []
-        let shutdown = null
         const all = Power.options
+        const normal = []
+        const danger = []
+        let shutdown = null
         for (let i = 0; i < all.length; ++i) {
-            if (all[i].key === "shutdown")
-                shutdown = all[i]
+            const o = all[i]
+            if (o.key === "shutdown") {
+                shutdown = o
+                continue
+            }
+            const entry = { key: o.key, label: o.label, icon: o.icon,
+                            kind: o.kind, flat: 0 }
+            if (o.kind === "danger")
+                danger.push(entry)
             else
-                buttons.push(all[i])
+                normal.push(entry)
         }
-        return { buttons: buttons, shutdown: shutdown }
+        const flat = normal.concat(danger)
+        for (let i = 0; i < flat.length; ++i)
+            flat[i].flat = i
+        return { normal: normal, danger: danger, flat: flat, shutdown: shutdown }
     }
-    readonly property var buttons: split.buttons
+    readonly property var buttons: split.flat
     readonly property var shutdown: split.shutdown
     readonly property var current: buttons.length > 0
                                    ? buttons[Math.min(currentIndex, buttons.length - 1)]
@@ -72,9 +88,11 @@ Item {
     // as the row it sits over — a wide bar over a narrow set of buttons reads as
     // two unrelated things stacked up. The floor keeps it from collapsing when
     // the machine offers only one or two actions.
+    function rowWidth(count) {
+        return count * 64 * root.unit + Math.max(0, count - 1) * 14 * root.unit
+    }
     readonly property real controlWidth: Math.min(
-        Math.max(buttons.length * 64 * root.unit
-                 + Math.max(0, buttons.length - 1) * 14 * root.unit,
+        Math.max(rowWidth(split.normal.length), rowWidth(split.danger.length),
                  300 * root.unit),
         root.width * 0.8)
 
@@ -92,7 +110,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: Qt.rgba(0.02, 0.03, 0.06, 1)
-        opacity: root.shown ? 0.42 : 0
+        opacity: root.shown ? 0.62 : 0
         MotionBehavior on opacity { active: !root.instant; duration: 300 }
         // Blank space is "get me out of here": clicking past the controls
         // dismisses the menu.
@@ -108,7 +126,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: "black"
-        opacity: slider.progress * 0.55
+        opacity: slider.progress * 0.35
     }
 
     // --- content ------------------------------------------------------------
@@ -262,150 +280,41 @@ Item {
             }
 
             // --- the buttons -----------------------------------------------
+            // Everything that can be taken back, then a rule, then everything
+            // that cannot. Restart is in the lower row because it is the first
+            // of the irreversible ones — not because it behaves like the update
+            // variants beside it.
             Row {
-                id: buttonRow
+                id: normalRow
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 14 * root.unit
-
                 Repeater {
-                    id: repeater
-                    model: root.buttons
+                    model: root.split.normal
+                    delegate: powerButtonDelegate
+                }
+            }
 
-                    delegate: Item {
-                        id: button
-                        required property int index
-                        required property var modelData
+            Item {
+                width: parent.width
+                height: 22 * root.unit
+                visible: root.split.danger.length > 0
 
-                        readonly property bool selected: root.focusRow === 1
-                                                         && root.currentIndex === button.index
-                        readonly property bool dangerous: button.modelData.kind === "danger"
-                        readonly property bool held: root.heldKey === button.modelData.key
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width
+                    height: 1
+                    color: Qt.rgba(1, 1, 1, 0.10)
+                }
+            }
 
-                        width: 64 * root.unit
-                        height: width + 26 * root.unit
-
-                        // One animated value per button drives the ring, so the
-                        // countdown and the action cannot drift apart.
-                        property real hold: 0
-                        property real entrance: 0
-
-                        MotionBehavior on entrance { duration: 240 }
-                        MotionBehavior on hold { active: !ringAnim.running; duration: 180 }
-
-                        // A fresh hold always counts from the start: cancelling
-                        // one and starting again must not resume where the last
-                        // one stopped, which reads as the countdown being flaky.
-                        onHeldChanged: {
-                            if (held) {
-                                hold = 0
-                                ringAnim.restart()
-                            } else {
-                                ringAnim.stop()
-                                hold = 0
-                            }
-                        }
-
-                        // The stagger is a timer per button rather than a delay
-                        // on MotionBehavior, which keeps the shared component a
-                        // plain transition.
-                        Timer {
-                            interval: Math.min(button.index, 6) * 22
-                            running: root.shown
-                            onTriggered: button.entrance = 1
-                        }
-                        Connections {
-                            target: root
-                            function onShownChanged() { if (!root.shown) button.entrance = 0 }
-                        }
-
-                        opacity: button.entrance
-                        transform: Translate { y: (1 - button.entrance) * 18 * root.unit }
-
-                        Rectangle {
-                            id: disc
-                            anchors.top: parent.top
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: parent.width
-                            height: parent.width
-                            radius: width / 2
-                            // A circular control with a border is jagged
-                            // without this.
-                            antialiasing: true
-                            color: Theme.surface
-                            border.width: 1 * root.unit
-                            border.color: button.selected ? Theme.surfaceBorderFocus : Theme.surfaceBorder
-                            scale: button.selected ? 1.06 : 1
-                            MotionBehavior on border.color { duration: 200 }
-                            MotionBehavior on scale { duration: 200 }
-
-                            PowerIcon {
-                                anchors.centerIn: parent
-                                name: button.modelData.icon
-                                size: 26 * root.unit
-                                color: button.selected ? Theme.textPrimary : Theme.textSecondary
-                            }
-                        }
-
-                        // The countdown, as a ring around the disc rather than a
-                        // bar inside it: the hold *is* the gesture, so its
-                        // progress should trace the thing being held.
-                        Shape {
-                            anchors.fill: disc
-                            visible: button.hold > 0.001
-
-                            ShapePath {
-                                strokeColor: Theme.accent
-                                strokeWidth: 2.4 * root.unit
-                                fillColor: "transparent"
-                                capStyle: ShapePath.RoundCap
-                                PathAngleArc {
-                                    centerX: disc.width / 2
-                                    centerY: disc.height / 2
-                                    radiusX: disc.width / 2 - 1.4 * root.unit
-                                    radiusY: disc.height / 2 - 1.4 * root.unit
-                                    startAngle: -90
-                                    sweepAngle: 360 * button.hold
-                                }
-                            }
-                        }
-
-                        Text {
-                            anchors.top: disc.bottom
-                            anchors.topMargin: 7 * root.unit
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: button.modelData.label
-                            color: button.selected ? Theme.textPrimary : Theme.textSecondary
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12 * root.unit
-                            MotionBehavior on color { duration: 200 }
-                        }
-
-                        NumberAnimation {
-                            id: ringAnim
-                            target: button
-                            property: "hold"
-                            from: 0
-                            to: 1
-                            duration: root.holdDuration
-                            onFinished: if (button.held) root.fire(button.modelData.key)
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: { root.focusRow = 1; root.currentIndex = button.index }
-                            onPressed: {
-                                root.focusRow = 1
-                                root.currentIndex = button.index
-                                // A dangerous button starts counting here and
-                                // only here; a quick click never arms it.
-                                if (button.dangerous)
-                                    root.heldKey = button.modelData.key
-                            }
-                            onReleased: { if (button.held) root.heldKey = "" }
-                            onClicked: { if (!button.dangerous) root.fire(button.modelData.key) }
-                        }
-                    }
+            Row {
+                id: dangerRow
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 14 * root.unit
+                visible: root.split.danger.length > 0
+                Repeater {
+                    model: root.split.danger
+                    delegate: powerButtonDelegate
                 }
             }
 
@@ -597,6 +506,151 @@ Item {
         }
         function onFailed(reason) {
             root.note = reason
+        }
+    }
+
+    // One delegate, two rows. `flat` is the entry's position across both rows,
+    // so the selection and the hold work on one index rather than two.
+    Component {
+        id: powerButtonDelegate
+
+        Item {
+            id: button
+            required property var modelData
+
+            readonly property bool selected: root.focusRow === 1
+                                             && root.currentIndex === button.modelData.flat
+            readonly property bool dangerous: button.modelData.kind === "danger"
+            readonly property bool held: root.heldKey === button.modelData.key
+
+            width: 64 * root.unit
+            height: width + 26 * root.unit
+
+            // One animated value per button drives the ring, so the countdown
+            // and the action cannot drift apart.
+            property real hold: 0
+            property real entrance: 0
+
+            MotionBehavior on entrance { duration: 240 }
+            MotionBehavior on hold { active: ringAnim.running === false; duration: 180 }
+
+            // A fresh hold always counts from the start: cancelling one and
+            // starting again must not resume where the last one stopped, which
+            // reads as the countdown being flaky.
+            onHeldChanged: {
+                if (held) {
+                    hold = 0
+                    ringAnim.restart()
+                } else {
+                    ringAnim.stop()
+                    hold = 0
+                }
+            }
+
+            // The stagger is a timer per button rather than a delay on
+            // MotionBehavior, which keeps the shared component a plain
+            // transition.
+            Timer {
+                interval: Math.min(button.modelData.flat, 6) * 22
+                running: root.shown
+                onTriggered: button.entrance = 1
+            }
+            Connections {
+                target: root
+                function onShownChanged() { if (root.shown === false) button.entrance = 0 }
+            }
+
+            opacity: button.entrance
+            transform: Translate { y: (1 - button.entrance) * 18 * root.unit }
+
+            Rectangle {
+                id: disc
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
+                height: parent.width
+                radius: width / 2
+                // A circular control with a border is jagged without this.
+                antialiasing: true
+                color: Theme.surface
+                border.width: 1 * root.unit
+                border.color: button.selected ? Theme.surfaceBorderFocus : Theme.surfaceBorder
+                scale: button.selected ? 1.06 : 1
+                MotionBehavior on border.color { duration: 200 }
+                MotionBehavior on scale { duration: 200 }
+
+                PowerIcon {
+                    anchors.centerIn: parent
+                    name: button.modelData.icon
+                    size: 26 * root.unit
+                    color: button.selected ? Theme.textPrimary : Theme.textSecondary
+                }
+            }
+
+            // The countdown, as a ring around the disc rather than a bar inside
+            // it: the hold *is* the gesture, so its progress should trace the
+            // thing being held. The curve renderer is what keeps the arc's edge
+            // smooth — the default one draws it stepped.
+            Shape {
+                anchors.fill: disc
+                visible: button.hold > 0.001
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeColor: Theme.accent
+                    strokeWidth: 2.4 * root.unit
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    PathAngleArc {
+                        centerX: disc.width / 2
+                        centerY: disc.height / 2
+                        radiusX: disc.width / 2 - 1.4 * root.unit
+                        radiusY: disc.height / 2 - 1.4 * root.unit
+                        startAngle: -90
+                        sweepAngle: 360 * button.hold
+                    }
+                }
+            }
+
+            Text {
+                anchors.top: disc.bottom
+                anchors.topMargin: 7 * root.unit
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: button.modelData.label
+                color: button.selected ? Theme.textPrimary : Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: 12 * root.unit
+                MotionBehavior on color { duration: 200 }
+            }
+
+            NumberAnimation {
+                id: ringAnim
+                target: button
+                property: "hold"
+                from: 0
+                to: 1
+                duration: root.holdDuration
+                onFinished: if (button.held) root.fire(button.modelData.key)
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                onEntered: {
+                    root.focusRow = 1
+                    root.currentIndex = button.modelData.flat
+                }
+                onPressed: {
+                    root.focusRow = 1
+                    root.currentIndex = button.modelData.flat
+                    // A dangerous button starts counting here and only here; a
+                    // quick click never arms it.
+                    if (button.dangerous)
+                        root.heldKey = button.modelData.key
+                }
+                onReleased: { if (button.held) root.heldKey = "" }
+                onClicked: { if (button.dangerous === false) root.fire(button.modelData.key) }
+            }
         }
     }
 

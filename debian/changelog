@@ -1,3 +1,25 @@
+lumina-lock (0.4.15-1) unstable; urgency=medium
+
+  * Darkened the power menu's base: the backdrop went from 0.42 to 0.62, so the
+    desktop behind it starts dimmer and the slide has further to take it. The
+    slide's own overlay came down to 0.35 to keep the top of the range where it
+    was — measured on the backdrop, (3,5,9) at rest against (2,3,6) before.
+  * The slide is shut down, and only shut down. "Update and shut down" is a
+    button of its own again, as is "update and restart", and they are there only
+    when lastore actually has something to install: offering to install nothing
+    is a lie, and a control that cannot be pressed should not be drawn.
+  * Split the buttons by what they cost. Everything that can be taken back sits
+    in one row, everything that cannot in a row below it with a rule between, so
+    restart moved down with the irreversible ones instead of sitting beside
+    suspend and log out.
+  * Fixed the jagged icons and countdown ring. Shape has no `antialiasing`
+    property — that switch belongs to the renderer, and the default one draws
+    path edges without any, which is why the crescent, the snowflake, the arrows
+    and the ring all came out stepped. Both now use the curve renderer, which
+    antialiases analytically.
+
+ -- Lumina <lumina@example.com>  Thu, 17 Sep 2026 23:05:00 +0800
+
 lumina-lock (0.4.14-1) unstable; urgency=medium
 
   * Rebuilt the power menu around what each action costs, instead of around a

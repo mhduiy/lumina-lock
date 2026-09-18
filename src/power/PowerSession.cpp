@@ -155,18 +155,13 @@ void PowerSession::refreshAvailability()
 
 void PowerSession::rebuildOptions()
 {
-    // Only what this machine can do, in the order the menu wants them: the
-    // cheapest and most reversible first, the two that end the session last,
-    // and shutting down last of all because it is the slider.
+    // Only what this machine can do. Anything unavailable is left out entirely
+    // rather than greyed: a control that cannot be pressed should not be there
+    // to press.
     //
-    // Updates get no rows of their own. lastore runs the upgrade and then takes
-    // the machine down itself, so "update and restart" is not a third kind of
-    // restart — it is what restart means while updates are pending, and the same
-    // goes for shutting down. Carrying the wording on the two power actions is
-    // the whole merge: four entries about going away become two.
-    const QString shutdownLabel = m_updatesPending ? tr("更新并关机") : tr("关机");
-    const QString rebootLabel = m_updatesPending ? tr("更新并重启") : tr("重启");
-
+    // The order is the order the menu draws: everything that can be taken back
+    // first, then everything that cannot. Shutting down is the slider, so it is
+    // not in either row.
     QVariantList list;
     // Locking is meaningless while the lock is already the thing on screen.
     if (!m_lockSession || !m_lockSession->locked())
@@ -182,13 +177,28 @@ void PowerSession::rebuildOptions()
     if (m_canLogout)
         list << row(QStringLiteral("logout"), tr("注销"), QStringLiteral("logout"),
                     QStringLiteral("normal"));
-    // Restart is the other one that cannot be taken back, and the only button
-    // the menu makes you hold.
+
+    // Restart is the other one that cannot be taken back, and it sits with the
+    // update variants rather than with the reversible actions.
     if (m_canReboot)
-        list << row(QStringLiteral("reboot"), rebootLabel, QStringLiteral("restart"),
+        list << row(QStringLiteral("reboot"), tr("重启"), QStringLiteral("restart"),
                     QStringLiteral("danger"));
+
+    // The update variants are entries of their own, and they exist only when
+    // there is something to install: lastore runs the upgrade and then takes the
+    // machine down itself, so they are not the same thing as a plain restart or
+    // shut down, and offering them with nothing to install would be a lie.
+    if (m_updatesPending) {
+        if (m_canReboot)
+            list << row(QStringLiteral("updateReboot"), tr("更新并重启"),
+                        QStringLiteral("update"), QStringLiteral("danger"));
+        if (m_canShutdown)
+            list << row(QStringLiteral("updateShutdown"), tr("更新并关机"),
+                        QStringLiteral("update"), QStringLiteral("danger"));
+    }
+
     if (m_canShutdown)
-        list << row(QStringLiteral("shutdown"), shutdownLabel, QStringLiteral("power"),
+        list << row(QStringLiteral("shutdown"), tr("关机"), QStringLiteral("power"),
                     QStringLiteral("danger"));
 
     m_options = list;
@@ -301,11 +311,8 @@ void PowerSession::restart() { show(); Q_EMIT armRequested(QStringLiteral("reboo
 void PowerSession::logout() { show(); Q_EMIT armRequested(QStringLiteral("logout")); }
 void PowerSession::suspend() { show(); Q_EMIT armRequested(QStringLiteral("suspend")); }
 void PowerSession::hibernate() { show(); Q_EMIT armRequested(QStringLiteral("hibernate")); }
-// The D-Bus surface still has these two; they open the menu on the same
-// controls as shutdown and restart, which is what those mean while updates are
-// pending anyway.
-void PowerSession::updateAndShutdown() { show(); Q_EMIT armRequested(QStringLiteral("shutdown")); }
-void PowerSession::updateAndReboot() { show(); Q_EMIT armRequested(QStringLiteral("reboot")); }
+void PowerSession::updateAndShutdown() { show(); Q_EMIT armRequested(QStringLiteral("updateShutdown")); }
+void PowerSession::updateAndReboot() { show(); Q_EMIT armRequested(QStringLiteral("updateReboot")); }
 void PowerSession::switchUser() { show(); }
 
 void PowerSession::lock()
@@ -322,28 +329,22 @@ void PowerSession::highlight(const QString &key)
 
 void PowerSession::activate(const QString &key)
 {
-    if (key == QLatin1String("shutdown")) {
-        // One power action, two meanings. While updates are pending the update
-        // daemon owns the machine and takes it down itself once the upgrade has
-        // run, so there is nothing for us to wait for.
-        if (m_updatesPending)
-            requestUpdate(true);
-        else
-            requestSessionMethod(SESSION_MGR_REQUEST_SHUTDOWN);
-    } else if (key == QLatin1String("reboot")) {
-        if (m_updatesPending)
-            requestUpdate(false);
-        else
-            requestSessionMethod(SESSION_MGR_REQUEST_REBOOT);
-    } else if (key == QLatin1String("logout")) {
+    if (key == QLatin1String("shutdown"))
+        requestSessionMethod(SESSION_MGR_REQUEST_SHUTDOWN);
+    else if (key == QLatin1String("reboot"))
+        requestSessionMethod(SESSION_MGR_REQUEST_REBOOT);
+    else if (key == QLatin1String("updateShutdown"))
+        requestUpdate(true);
+    else if (key == QLatin1String("updateReboot"))
+        requestUpdate(false);
+    else if (key == QLatin1String("logout"))
         requestSessionMethod(SESSION_MGR_REQUEST_LOGOUT);
-    } else if (key == QLatin1String("suspend")) {
+    else if (key == QLatin1String("suspend"))
         requestSessionMethod(SESSION_MGR_REQUEST_SUSPEND);
-    } else if (key == QLatin1String("hibernate")) {
+    else if (key == QLatin1String("hibernate"))
         requestSessionMethod(SESSION_MGR_REQUEST_HIBERNATE);
-    } else if (key == QLatin1String("lock")) {
+    else if (key == QLatin1String("lock"))
         lock();
-    } else {
+    else
         qWarning().noquote() << "PowerSession: unknown action" << key;
-    }
 }
