@@ -13,6 +13,7 @@
 #include <QDBusConnection>
 #include <QDBusError>
 #include <QDBusInterface>
+#include <QFile>
 #include <QGuiApplication>
 #include <QQmlEngine>
 #include <QScreen>
