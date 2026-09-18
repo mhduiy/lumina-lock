@@ -199,7 +199,10 @@ Item {
                     color: Qt.rgba(1, 1, 1, 0.055)
                     border.width: 1 * root.unit
                     border.color: slider.focused ? Theme.surfaceBorderFocus : Theme.surfaceBorder
-                    MotionBehavior on border.color { duration: 200 }
+                    // ColorAnimation, not MotionBehavior: that one is a
+                    // NumberAnimation, and pointing it at a color interpolates
+                    // the value as a number — which lands on 0, i.e. black.
+                    Behavior on border.color { ColorAnimation { duration: 200 } }
                 }
 
                 // What has been pulled across so far, under the knob.
@@ -225,7 +228,7 @@ Item {
                     // with nothing to install, "更新并关机" when lastore has
                     // something to run first.
                     text: qsTr("滑动以") + root.shutdown.label
-                    color: Qt.rgba(1, 1, 1, 0.80)
+                    color: Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: 15 * root.unit
                     font.letterSpacing: 1.5 * root.unit
@@ -597,14 +600,17 @@ Item {
                 border.width: 1 * root.unit
                 border.color: button.selected ? Theme.surfaceBorderFocus : Theme.surfaceBorder
                 scale: button.selected ? 1.06 : 1
-                MotionBehavior on border.color { duration: 200 }
+                Behavior on border.color { ColorAnimation { duration: 200 } }
                 MotionBehavior on scale { duration: 200 }
 
                 PowerIcon {
                     anchors.centerIn: parent
                     name: button.modelData.icon
                     size: 26 * root.unit
-                    color: button.selected ? Theme.textPrimary : Theme.textSecondary
+                    // Plain white, always: the icon and the label are what has
+                    // to stay readable in every state, and the selection already
+                    // shows itself on the disc around them.
+                    color: Theme.textPrimary
                 }
             }
 
@@ -640,10 +646,9 @@ Item {
                 anchors.topMargin: 7 * root.unit
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: button.modelData.label
-                color: button.selected ? Theme.textPrimary : Qt.rgba(1, 1, 1, 0.78)
+                color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: 12 * root.unit
-                MotionBehavior on color { duration: 200 }
             }
 
             NumberAnimation {
