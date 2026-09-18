@@ -97,6 +97,7 @@ Item {
     //
     // `visible` follows the opacity, which keeps the item alive for the length
     // of the fade.
+    //
     Image {
         id: poster
         anchors.fill: parent

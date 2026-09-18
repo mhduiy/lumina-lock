@@ -1,3 +1,23 @@
+lumina-lock (0.4.28) unstable; urgency=medium
+
+  * Random video wallpapers. The control center's wallpaper page takes a list of
+    videos and a new "video (random)" type: every lock draws one of them, never
+    the same one twice in a row, checking that the file is still there each time,
+    and falling back to the built-in wallpaper when the list is empty or nothing
+    in it exists. All screens share the one draw.
+  * The clock and the date can be moved as a pair, by a percentage on each axis
+    (50 stays where they were). Once moved, the pair fades out where it is and
+    fades back in at the middle of the screen while the password box arrives.
+  * The control center page reads and writes DConfig through guarded helpers: a
+    key is asked for before it is read or written, a write is read back, and a
+    failure is reported instead of silently doing nothing. dtk6's setValue() is
+    void, and reading a key the schema does not carry used to dereference null.
+  * Six sandboxed test scripts, one per thing that broke while this was built:
+    the lock surface loading, the video list dialog, the plugin QML, the draw
+    rule, the config round trip, and adding a video through the plugin.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 15:42:31 +0800
+
 lumina-lock (0.4.27) unstable; urgency=medium
 
   * Rebuilt the slide's sweeping highlight so that it keeps both things at once,

@@ -1,6 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <rect x="40" y="58" width="48" height="46" rx="8" fill="none" stroke="#2ca7f8" stroke-width="6"/>
-  <path d="M50 58 v-14 a14 14 0 0 1 28 0 v14" fill="none" stroke="#2ca7f8" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="64" cy="78" r="5" fill="#2ca7f8"/>
-  <rect x="61" y="81" width="6" height="12" rx="3" fill="#2ca7f8"/>
+  <!-- 控制中心「锁屏壁纸」模块图标：实心渐变方块（铺满画布、不留边距），
+       锁形为负空间，锁体里透出远山与太阳。渐变沿用主题蓝。
+       本文件是图源，随包发布的是由它生成的 DCI（:/dsg/icons/luminalock.dci）。 -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#57b6ff"/>
+      <stop offset="1" stop-color="#1a74d6"/>
+    </linearGradient>
+    <mask id="m">
+      <rect width="128" height="128" fill="white"/>
+      <g transform="translate(64 58) scale(1.14) translate(-64 -58)">
+        <g fill="black">
+          <rect x="26" y="52" width="76" height="64" rx="18"/>
+        </g>
+        <path d="M44 54 v-16 a20 20 0 0 1 40 0 v16" fill="none" stroke="black"
+              stroke-width="15" stroke-linecap="round"/>
+        <circle cx="80" cy="72" r="7" fill="white"/>
+        <path d="M36 106 L56 80 L68 94 L78 84 L92 106" fill="none" stroke="white"
+              stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </mask>
+  </defs>
+  <rect x="0" y="0" width="128" height="128" rx="30" fill="url(#g)" mask="url(#m)"/>
 </svg>

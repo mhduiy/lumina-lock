@@ -140,6 +140,9 @@ Window {
         property real dimOpacity: 0
         property real blurAmount: 0
         property real clockOffset: 0
+        // 1 = 时间日期在场，0 = 认证时完全隐去。和 authReveal 反向，用同一套
+        // MotionBehavior 驱动：密码框升起的同时时间日期上移淡出，收起时下移淡入。
+        property real clockReveal: 1
         property real authReveal: 0
 
         // Toggled off while a re-lock resets the scene, so the layout snaps
@@ -163,8 +166,36 @@ Window {
             revealed: content.sceneReady
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: content.clockOffset
-            opacity: content.sceneReady ? 1 : 0
+            // 时间/日期位置：0 = 贴左/上边缘，50 = 居中（默认），100 = 贴右/下边缘。
+            // 认证时**在这一份上渐隐**（同时按原设计上移 16%），而在标准位置（屏幕
+            // 正中）上另有一份渐显 —— 两份同时进行，看起来就是"移到中间去了"。
+            // 不做越界夹取：夹取会让位移量随字号和动画过程变化，看着就是顿。
+            readonly property bool atCenter: Math.abs(LockAppearance.clockPositionX - 0.5) < 0.001
+                                             && Math.abs(LockAppearance.clockPositionY - 0.5) < 0.001
+            anchors.horizontalCenterOffset: (parent.width - clock.width)
+                                            * (LockAppearance.clockPositionX - 0.5)
+            anchors.verticalCenterOffset: (parent.height - clock.height)
+                                          * (LockAppearance.clockPositionY - 0.5)
+                                          + content.clockOffset
+            // 位置没调过（就是默认正中）时保持原来的动画：只上移 16%，不淡出；
+            // 调过位置时才有"这里渐隐 + 正中渐显"的交叉。
+            opacity: content.sceneReady ? (atCenter ? 1 : content.clockReveal) : 0
+            MotionBehavior on opacity { duration: 480; active: content.animating }
+        }
+
+        // 标准位置（屏幕正中）上的那一份：认证时在这里渐显，和上面那份的渐隐同时
+        // 进行。位置本来就是正中时不用它 —— 两份重叠会看出重影。
+        ClockView {
+            id: clockCentered
+            visible: !clock.atCenter
+            unit: root.u
+            compact: content.state !== "Idle"
+            glassSource: wallpaperHost
+            glassRefreshToken: wallpaperHost.ready ? 1 : 0
+            glassLive: WallpaperManager.isVideo
+            revealed: content.sceneReady
+            anchors.centerIn: parent
+            opacity: content.sceneReady ? content.authReveal : 0
             MotionBehavior on opacity { duration: 480; active: content.animating }
         }
 
@@ -217,6 +248,7 @@ Window {
                 PropertyChanges { target: content; dimOpacity: 0 }
                 PropertyChanges { target: content; blurAmount: 0 }
                 PropertyChanges { target: content; clockOffset: 0 }
+                PropertyChanges { target: content; clockReveal: 1 }
                 PropertyChanges { target: content; authReveal: 0 }
             },
             State {
@@ -224,6 +256,7 @@ Window {
                 PropertyChanges { target: content; dimOpacity: 0.42 }
                 PropertyChanges { target: content; blurAmount: 0.75 }
                 PropertyChanges { target: content; clockOffset: -root.height * 0.16 }
+                PropertyChanges { target: content; clockReveal: 0 }
                 PropertyChanges { target: content; authReveal: 1 }
             }
         ]
@@ -231,6 +264,7 @@ Window {
         MotionBehavior on dimOpacity { active: content.animating }
         MotionBehavior on blurAmount { active: content.animating }
         MotionBehavior on clockOffset { active: content.animating }
+        MotionBehavior on clockReveal { active: content.animating }
         MotionBehavior on authReveal { active: content.animating }
     }
 
@@ -432,6 +466,7 @@ Window {
         content.dimOpacity = 0
         content.blurAmount = 0
         content.clockOffset = 0
+        content.clockReveal = 1
         content.authReveal = 0
         content.opacity = 1
         content.sceneReady = false

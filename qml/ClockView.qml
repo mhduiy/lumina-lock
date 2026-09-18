@@ -75,8 +75,11 @@ Item {
     readonly property real clockCompactRatio: 0.64   // 96 / 150
     readonly property real dateCompactRatio: 0.815   // 22 / 27
 
-    width: 800 * unit
-    height: 240 * unit
+    // 这一组（时间 + 日期）自己的尺寸：外面的 LockScreen 按百分比摆放它（0 = 贴左/上，
+    // 50 = 居中，100 = 贴右/下），所以这里用内容的实际大小，而不是一个固定的框 ——
+    // 否则「贴左」贴的是框的左边，而不是字的左边。
+    width: column.implicitWidth
+    height: column.implicitHeight
 
     property string timeText: Qt.formatTime(new Date(), "HH:mm")
     property string dateText: Qt.formatDate(new Date(), "dddd, MMMM d")
