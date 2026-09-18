@@ -224,24 +224,21 @@ Item {
                 }
 
                 // The hint, with a highlight that sweeps across it the way the
-                // one on iOS does. It takes two pieces: a bar whose gradient
-                // carries the brightness — dim either side, bright in the band —
-                // and the text, which is what the light is drawn through. Text
-                // has no gradient of its own in Qt Quick, and this is cheaper
-                // than a precompiled shader for one label.
+                // one on iOS does: the same text twice, the second one at full
+                // white and shown only through a window that travels across it.
                 //
-                // The text is the *source* and the bar is the mask, not the
-                // other way round. The other way round works too, and that is
-                // how it was first written, but the glyph shape then comes out
-                // of the mask's alpha channel and loses its antialiasing: at 8x
-                // the strokes were hard-edged and had no subpixel colour, next to
-                // ordinary labels that had both. As the source the glyphs are
-                // drawn as text, with everything a text item gets, and the mask
-                // only modulates how bright they are.
+                // This is the third construction of the three, and the only one
+                // that keeps both things. The first had the text as a MultiEffect
+                // mask and the gradient as its source: the sweep worked, but the
+                // glyph shape then comes out of the mask, and the mask behaves
+                // as a hard threshold — the strokes were stepped at 8x while
+                // ordinary labels were smooth. The second swapped them, and the
+                // mask's threshold meant nothing dimmed at all: the label read as
+                // solid white, or vanished, depending on where the band was.
                 //
-                // The band moves by animating the gradient's stop positions
-                // rather than by moving the bar: the stops are relative to the
-                // bar's bounds, so nothing has to stay aligned with the text.
+                // Two ordinary text items have none of that. Both are drawn as
+                // text and keep their antialiasing; the only thing the window
+                // does is decide which part of the second one is seen.
                 Item {
                     id: hintLabel
                     anchors.centerIn: parent
@@ -252,7 +249,8 @@ Item {
                     // have to be read while it is being performed.
                     opacity: Math.max(0, 1 - slider.progress * 2.4)
 
-                    // Where the band is, in the bar's own coordinates.
+                    // 0 to 1 across the label, and a little beyond either side so
+                    // the band enters and leaves rather than appearing on it.
                     property real sweep: -0.25
                     NumberAnimation on sweep {
                         from: -0.25
@@ -263,68 +261,35 @@ Item {
                         easing.type: Easing.InOutSine
                     }
 
+                    // The label at rest. A little under white on purpose: a
+                    // highlight needs something to stand out from.
                     Text {
                         id: hintText
                         text: qsTr("滑动以") + root.shutdown.label
-                        // Full white: the dimming and the highlight are the
-                        // mask's job now.
-                        color: Theme.textPrimary
+                        color: Qt.rgba(1, 1, 1, 0.66)
                         font.family: Theme.fontFamily
                         font.pixelSize: 15 * root.unit
                         font.letterSpacing: 1.5 * root.unit
-                        // Hidden like the mask: MultiEffect draws the items it
-                        // is given whether or not they are visible, but it does
-                        // not hide them itself — leaving this visible draws the
-                        // text twice, once plainly and once through the effect.
-                        visible: false
                     }
 
-                    Rectangle {
-                        id: sheen
-                        anchors.fill: parent
-                        visible: false
-                        layer.enabled: true
-                        gradient: Gradient {
-                            orientation: Gradient.Horizontal
-                            // The brightness the light is drawn through, as
-                            // grey levels rather than as white with varying
-                            // alpha: MultiEffect reads the mask's *colour*, not
-                            // its alpha, so a mask that is white everywhere
-                            // multiplies by one everywhere and the band does
-                            // nothing at all. Dim either side, full white inside
-                            // the band, held flat across the middle — a single
-                            // peak with ramps either side is a gloss you have to
-                            // be told about, a plateau is a band you can see.
-                            GradientStop { position: 0.0; color: "#A8A8A8" }
-                            GradientStop {
-                                position: Math.max(0.0, hintLabel.sweep - 0.20)
-                                color: "#A8A8A8"
-                            }
-                            GradientStop {
-                                position: Math.max(0.0, hintLabel.sweep - 0.05)
-                                color: "#FFFFFF"
-                            }
-                            GradientStop {
-                                position: Math.min(1.0, hintLabel.sweep + 0.05)
-                                color: "#FFFFFF"
-                            }
-                            GradientStop {
-                                position: Math.min(1.0, hintLabel.sweep + 0.20)
-                                color: "#A8A8A8"
-                            }
-                            GradientStop { position: 1.0; color: "#A8A8A8" }
+                    // The window the highlight is seen through. Its own edges are
+                    // hard, which is what a band of light looks like; the glyphs
+                    // inside it are not affected.
+                    Item {
+                        id: band
+                        clip: true
+                        width: hintLabel.width * 0.30
+                        height: hintLabel.height
+                        x: hintLabel.sweep * (hintLabel.width + band.width) - band.width
+
+                        Text {
+                            // Kept aligned with the label underneath, so the two
+                            // read as one line of text with a light on it.
+                            x: -band.x
+                            text: hintText.text
+                            color: Theme.textPrimary
+                            font: hintText.font
                         }
-                    }
-
-                    MultiEffect {
-                        anchors.fill: parent
-                        source: hintText
-                        maskSource: sheen
-                        maskEnabled: true
-                        // A soft mask range: the defaults are a hard threshold,
-                        // which would step the band's edges.
-                        maskThresholdMin: 0.0
-                        maskThresholdMax: 1.0
                     }
                 }
 

@@ -1,3 +1,24 @@
+lumina-lock (0.4.27) unstable; urgency=medium
+
+  * Rebuilt the slide's sweeping highlight so that it keeps both things at once,
+    which the previous two attempts each lost in turn. It is the same text twice
+    now: the label at rest, and a full-white copy seen only through a window that
+    travels across it. Two ordinary text items have no mask semantics to fight —
+    both are drawn as text and keep their antialiasing, and the window only
+    decides which part of the second one is shown.
+  * What the earlier attempts ran into, for the record. With the text as a
+    MultiEffect mask the sweep worked, but the glyph shape then comes out of the
+    mask and the mask behaves as a hard threshold: the strokes were stepped at 8x
+    beside ordinary labels that were smooth. Swapping source and mask let the
+    same threshold swallow the band entirely — the label read as solid white, or
+    vanished, depending on where the band was; the six-column profile showed
+    either 255 everywhere or nothing at all. Measured across one sweep now: the
+    resting columns hold at 180 and the band reaches 255 as it crosses.
+  * The band's own edges are hard, which is what a band of light looks like. The
+    glyphs inside it are not affected.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 14:05:00 +0800
+
 lumina-lock (0.4.26) unstable; urgency=medium
 
   * Fixed the slide's label being drawn without antialiasing. It was built with
