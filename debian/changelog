@@ -1,3 +1,34 @@
+lumina-lock (0.4.18) unstable; urgency=medium
+
+  * The slide's danger colour is driven by the drag instead of being worn at
+    rest. The fill sits under the knob, so painting it at rest put a knob-sized
+    red disc behind the knob — which read as a stain on the control rather than
+    as emphasis on it. It is proportional to the travel now: neutral at rest,
+    red as the knob moves. Measured on the knob's centre: (41,43,47) at rest,
+    (102,74,75) at 70%.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 10:20:00 +0800
+
+lumina-lock (0.4.18) unstable; urgency=medium
+
+  * The video wallpaper is hardware-decoded again on NVIDIA. Qt 6.8 loads its
+    FFmpeg media backend unless told otherwise, and that backend sizes NVDEC's
+    surface pool from the thread count — 16 threads on this box — while a
+    3840x2400 h264 stream needs 39 surfaces, past the driver's limit of 32.
+    cuvidCreateDecoder fails with CUDA_ERROR_INVALID_VALUE and Qt decodes in
+    software from then on, silently: the only trace is an ffmpeg warning on
+    stderr that nothing was reading. Measured on the stock 4K wallpaper, the
+    decoder engine sat at 0% and playback burned 0.60 core. The GStreamer
+    backend picks NVDEC instead (gst's nvh264dec outranks avdec_h264), so the
+    lock now asks for it — but only when NVIDIA's driver is the one loaded, so
+    VA-API and other vendors' hardware paths are left on the backend that
+    handles them, and an explicit QT_MEDIA_BACKEND still wins.
+  * Same wallpaper, same measurement, through the GStreamer backend: decoder
+    engine 14-23%, 0.27 core. Frames arrive at VideoOutput.videoSink at the
+    same 30 fps, so the reveal and poster logic did not need to change.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 10:40:00 +0800
+
 lumina-lock (0.4.17) unstable; urgency=medium
 
   * The slide now reaches the darkest the screen goes. The overlay tops out at

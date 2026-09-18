@@ -212,9 +212,12 @@ Item {
                     antialiasing: true
                     // Shutting down is the one action that cannot be taken
                     // back, so its control carries the danger colour rather
-                    // than the accent every other control uses.
+                    // than the accent every other control uses — and it is
+                    // driven by the drag, not worn at rest. The fill sits under
+                    // the knob, so painting it at rest put a red disc behind
+                    // the knob and read as a stain rather than as emphasis.
                     color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b,
-                                   0.10 + 0.30 * slider.progress)
+                                   0.34 * slider.progress)
                 }
 
                 Text {
