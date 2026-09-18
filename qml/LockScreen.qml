@@ -339,9 +339,13 @@ Window {
                 height: width
                 radius: width / 2
                 antialiasing: true
-                // Visible only while it is arriving or arrived: an invisible
-                // control that still takes clicks is worse than no control.
-                visible: control.entrance > 0.001
+                // Opacity, not visibility. A Row skips invisible children when
+                // it lays out, so hiding this until it arrives lets the other
+                // one take the empty place — and since the row is anchored to the
+                // right edge, the one that arrives first appears where the second
+                // belongs and is then pushed out of it. Both stay in the layout
+                // from the start; only the click area is switched off while a
+                // button is not really there.
                 opacity: control.entrance
                 color: hover.hovered ? Qt.rgba(1, 1, 1, 0.26) : Theme.surface
                 border.width: 1 * root.u
@@ -399,6 +403,7 @@ Window {
                     id: hover
                     anchors.fill: parent
                     hoverEnabled: true
+                    enabled: control.entrance > 0.5
                     onClicked: {
                         if (control.modelData.action === "power")
                             Power.show()

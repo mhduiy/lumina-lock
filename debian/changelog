@@ -1,3 +1,19 @@
+lumina-lock (0.4.29) unstable; urgency=medium
+
+  * Fixed the lock screen's corner buttons swapping places as they arrived. The
+    one that came in first appeared where the second belongs and was then pushed
+    out of it. A Row skips invisible children when it lays out, and this row is
+    anchored to the right edge — so with only the first one visible it took the
+    space the second would have had. Both stay in the layout from the start now:
+    opacity carries the arrival, and the click area is what gets switched off
+    while a button is not really there.
+    Measured frame by frame from a recording, the first button's position against
+    the second's: 121/121 before either arrives, 175/92 as the first comes in,
+    231/146 as the tail follows it, 255/255 once both are there. The first is
+    never seen anywhere but its own place.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 17:30:00 +0800
+
 lumina-lock (0.4.28) unstable; urgency=medium
 
   * Random video wallpapers. The control center's wallpaper page takes a list of
