@@ -1,3 +1,26 @@
+lumina-lock (0.4.25) unstable; urgency=medium
+
+  * The slide's label has a highlight that sweeps across it, the way the one on
+    iOS does. Text has no gradient of its own in Qt Quick, so it takes two
+    pieces: a bar whose gradient carries a bright band, and the text used as a
+    mask, so the band is only ever visible inside the glyphs. The band moves by
+    animating the gradient's stop positions rather than by moving the bar — the
+    stops are relative to the bar's bounds, so nothing has to stay aligned with
+    the mask.
+  * The mask is the text, hidden and layered, which is how MultiEffect takes one.
+    Unlike a rounded Rectangle in a layer, a text item keeps its antialiasing
+    there, because glyphs are drawn into a texture with their coverage intact:
+    the edges are clean at 4x zoom.
+  * The bright part is a plateau rather than a single peak. A peak with ramps
+    either side is a gloss you have to be told about; a plateau is a band you can
+    see. Measured across one sweep, brightest pixel of the left half against the
+    right: 180/180 at rest, 255/255 with the band across the middle, 255/180 with
+    it on the left.
+  * It sweeps only while the menu is up, and the base sits a little under white
+    on purpose — a highlight needs something to stand out from.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 12:30:00 +0800
+
 lumina-lock (0.4.24) unstable; urgency=medium
 
   * Fixed the password field going deaf after dismissing the power menu with

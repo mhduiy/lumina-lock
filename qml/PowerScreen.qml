@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Shapes
 import Lumina 1.0
 import "components"
@@ -222,19 +223,96 @@ Item {
                                    0.34 * slider.progress)
                 }
 
-                Text {
+                // The hint, with a highlight that sweeps across it the way the
+                // one on iOS does. It takes two pieces: a bar carrying a bright
+                // band in its gradient, and the text used as a mask — so the band
+                // is only ever visible inside the glyphs, which is the whole
+                // effect. Text has no gradient of its own in Qt Quick, and this
+                // is cheaper than a precompiled shader for one label.
+                //
+                // The band moves by animating the gradient's stop positions
+                // rather than by moving the bar: the stops are relative to the
+                // bar's bounds, so nothing has to stay aligned with the mask.
+                //
+                // The mask is the text, hidden and layered, which is how
+                // MultiEffect takes one — and unlike a rounded Rectangle in a
+                // layer, a text item keeps its antialiasing there, because glyphs
+                // are drawn into a texture with their coverage intact.
+                Item {
+                    id: hintLabel
                     anchors.centerIn: parent
-                    // The label carries the update merge: "关机" on a machine
-                    // with nothing to install, "更新并关机" when lastore has
-                    // something to run first.
-                    text: qsTr("滑动以") + root.shutdown.label
-                    color: Theme.textPrimary
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15 * root.unit
-                    font.letterSpacing: 1.5 * root.unit
+                    width: hintText.width
+                    height: hintText.height
+                    visible: root.shutdown !== null
                     // Gone by the time the knob is halfway: a gesture should not
                     // have to be read while it is being performed.
                     opacity: Math.max(0, 1 - slider.progress * 2.4)
+
+                    // Where the band is, in the bar's own coordinates.
+                    property real sweep: -0.25
+                    NumberAnimation on sweep {
+                        from: -0.25
+                        to: 1.25
+                        duration: 2400
+                        loops: Animation.Infinite
+                        running: root.shown
+                        easing.type: Easing.InOutSine
+                    }
+
+                    Text {
+                        id: hintText
+                        text: qsTr("滑动以") + root.shutdown.label
+                        color: Theme.textPrimary
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 15 * root.unit
+                        font.letterSpacing: 1.5 * root.unit
+                        visible: false
+                        layer.enabled: true
+                    }
+
+                    Rectangle {
+                        id: sheen
+                        anchors.fill: parent
+                        visible: false
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            // Dim either side of the band and bright inside it,
+                            // with the bright part held flat across the middle: a
+                            // single peak with ramps either side is a gloss you
+                            // have to be told about, a plateau is a band you can
+                            // see. The base is a little under white on purpose —
+                            // a highlight needs something to stand out from.
+                            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.66) }
+                            GradientStop {
+                                position: Math.max(0.0, hintLabel.sweep - 0.20)
+                                color: Qt.rgba(1, 1, 1, 0.66)
+                            }
+                            GradientStop {
+                                position: Math.max(0.0, hintLabel.sweep - 0.05)
+                                color: "#FFFFFF"
+                            }
+                            GradientStop {
+                                position: Math.min(1.0, hintLabel.sweep + 0.05)
+                                color: "#FFFFFF"
+                            }
+                            GradientStop {
+                                position: Math.min(1.0, hintLabel.sweep + 0.20)
+                                color: Qt.rgba(1, 1, 1, 0.66)
+                            }
+                            GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.66) }
+                        }
+                    }
+
+                    MultiEffect {
+                        anchors.fill: parent
+                        source: sheen
+                        maskSource: hintText
+                        maskEnabled: true
+                        // A soft mask range: the defaults are a hard threshold,
+                        // which would step the glyph edges.
+                        maskThresholdMin: 0.0
+                        maskThresholdMax: 1.0
+                    }
                 }
 
                 Rectangle {
