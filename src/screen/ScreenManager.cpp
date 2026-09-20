@@ -127,61 +127,127 @@ void ScreenManager::showAll()
     }
 }
 
-void ScreenManager::showPowerMenu()
+void ScreenManager::createPowerWindowForScreen(QScreen *screen)
 {
-    if (!m_powerWindow) {
-        if (m_powerUrl.isEmpty() || !m_engine) {
-            qWarning() << "ScreenManager: no power surface configured";
-            return;
-        }
-        QQmlComponent component(m_engine, m_powerUrl, this);
-        if (component.isError()) {
-            qWarning().noquote() << "ScreenManager: failed to load" << m_powerUrl.toString();
-            const auto errors = component.errors();
-            for (const QQmlError &error : errors)
-                qWarning().noquote() << "  " << error.toString();
-            return;
-        }
-        m_powerWindow = qobject_cast<QQuickWindow *>(component.create());
-        if (!m_powerWindow) {
-            qWarning().noquote() << "ScreenManager: root of" << m_powerUrl.toString()
-                                 << "is not a Window";
-            return;
-        }
-        // Flags and colour are declared in qml/PowerWindow.qml so that they are
-        // in place before any native window exists; setting them here would
-        // recreate the native window and race the mapping.
-        //
-        // Sized from the screen the way the lock's windows are: a window that is
-        // only asked to go fullscreen keeps whatever geometry it was created
-        // with until the window manager answers, and until then the menu draws
-        // into a 160x160 corner.
-        QScreen *target = nullptr;
-        if (m_authScreen)
-            target = m_authScreen;
-        else if (!m_windows.isEmpty())
-            target = m_windows.constBegin().value()->screen();
-        if (!target)
-            target = QGuiApplication::primaryScreen();
-        if (target) {
-            m_powerWindow->setScreen(target);
-            m_powerWindow->setGeometry(target->geometry());
-        }
-        m_powerWindow->installEventFilter(this);
+    if (!screen || m_powerWindows.contains(screen))
+        return;
+    if (m_powerUrl.isEmpty() || !m_engine) {
+        qWarning() << "ScreenManager: no power surface configured";
+        return;
     }
 
-    m_powerWindow->showFullScreen();
-    m_powerWindow->raise();
-    m_powerWindow->requestActivate();
-    m_powerWindow->requestUpdate();
+    QQmlComponent component(m_engine, m_powerUrl, this);
+    if (component.isError()) {
+        qWarning().noquote() << "ScreenManager: failed to load" << m_powerUrl.toString();
+        const auto errors = component.errors();
+        for (const QQmlError &error : errors)
+            qWarning().noquote() << "  " << error.toString();
+        return;
+    }
 
-    // The keyboard belongs to the menu while it is up; the grab moves with it.
-    m_grabWindow = m_powerWindow;
-    m_grabInput = true;
-    applyKeyboardGrab();
+    QQuickWindow *window = qobject_cast<QQuickWindow *>(component.create());
+    if (!window) {
+        qWarning().noquote() << "ScreenManager: root of" << m_powerUrl.toString()
+                             << "is not a Window";
+        return;
+    }
 
-    qWarning().nospace() << "ScreenManager: showPowerMenu visible=" << m_powerWindow->isVisible()
-                         << " visibility=" << static_cast<int>(m_powerWindow->visibility());
+    // Flags and colour are declared in qml/PowerWindow.qml so that they are in
+    // place before any native window exists; setting them here would recreate
+    // the native window and race the mapping.
+    //
+    // Sized from the screen the way the lock's windows are: a window that is
+    // only asked to go fullscreen keeps whatever geometry it was created with
+    // until the window manager answers, and until then the menu draws into a
+    // 160x160 corner.
+    window->setScreen(screen);
+    window->setGeometry(screen->geometry());
+    window->installEventFilter(this);
+    m_powerWindows.insert(screen, window);
+}
+
+void ScreenManager::destroyPowerWindowForScreen(QScreen *screen)
+{
+    auto it = m_powerWindows.find(screen);
+    if (it == m_powerWindows.end())
+        return;
+
+    QQuickWindow *window = it.value();
+    m_powerWindows.erase(it);
+    if (window == m_grabWindow)
+        m_grabWindow = nullptr;
+    if (window)
+        window->deleteLater();
+}
+
+QString ScreenManager::powerControlScreenName() const
+{
+    return m_powerControlScreen ? m_powerControlScreen->name() : QString();
+}
+
+void ScreenManager::setPowerControlScreen(QScreen *screen)
+{
+    if (screen == m_powerControlScreen)
+        return;
+
+    QScreen *previous = m_powerControlScreen;
+    m_powerControlScreen = screen;
+
+    // The direction from the old screen to the new one. Only the sign matters:
+    // each surface multiplies it by its own travel. The side the controls leave
+    // by on one screen is the side they arrive by on the other.
+    int dx = 0;
+    int dy = 0;
+    if (previous && screen) {
+        dx = screen->geometry().x() - previous->geometry().x();
+        dy = screen->geometry().y() - previous->geometry().y();
+        dx = dx == 0 ? 0 : (dx > 0 ? 1 : -1);
+        dy = dy == 0 ? 0 : (dy > 0 ? 1 : -1);
+    }
+
+    emit powerControlScreenChanged(powerControlScreenName(), dx, dy);
+
+    // The keys follow the controls, the same way they follow the password field.
+    if (QQuickWindow *window = m_powerWindows.value(screen)) {
+        m_grabWindow = window;
+        m_grabInput = true;
+        applyKeyboardGrab();
+    }
+
+    qWarning().nospace() << "ScreenManager: power controls on " << powerControlScreenName()
+                         << " direction " << dx << "," << dy;
+}
+
+void ScreenManager::activatePowerForScreen(const QString &screenName)
+{
+    setPowerControlScreen(screenByName(screenName));
+}
+
+void ScreenManager::showPowerMenu()
+{
+    // A window per screen, so the whole desktop dims rather than one monitor,
+    // and so the controls can be carried from one to another. Only the screen
+    // under the pointer draws anything to press.
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    for (QScreen *screen : screens)
+        createPowerWindowForScreen(screen);
+
+    for (QQuickWindow *window : std::as_const(m_powerWindows)) {
+        window->showFullScreen();
+        window->raise();
+        window->requestActivate();
+        // A window that was hidden and is mapped again does not necessarily get
+        // painted; without this it is up, mapped, and shows nothing.
+        window->requestUpdate();
+    }
+
+    QScreen *control = QGuiApplication::screenAt(QCursor::pos());
+    if (!control)
+        control = m_authScreen ? m_authScreen : QGuiApplication::primaryScreen();
+    setPowerControlScreen(control);
+
+    qWarning().nospace() << "ScreenManager: showPowerMenu windows=" << m_powerWindows.size()
+                         << " controls=" << powerControlScreenName();
 }
 
 void ScreenManager::hidePowerMenu()
@@ -198,8 +264,18 @@ void ScreenManager::hidePowerMenu()
     m_grabInput = m_visible;
     applyKeyboardGrab();
 
-    if (m_powerWindow)
-        m_powerWindow->hide();
+    // Destroyed rather than hidden: they are mapped onto specific screens, and
+    // the screens can change between one showing and the next.
+    const auto windows = m_powerWindows;
+    m_powerWindows.clear();
+    m_powerControlScreen = nullptr;
+    for (QQuickWindow *window : windows) {
+        if (!window)
+            continue;
+        window->hide();
+        window->deleteLater();
+    }
+
     qWarning().nospace() << "ScreenManager: hidePowerMenu visible=" << m_visible
                          << " grabWindow="
                          << (m_grabWindow ? m_grabWindow->title() : QStringLiteral("none"))
@@ -342,8 +418,10 @@ bool ScreenManager::eventFilter(QObject *watched, QEvent *event)
     // authentication yet (the idle lock) the target is never the auth screen, so
     // every key was consumed as "wake this screen up" and Escape reached the
     // lock rather than the menu. That left the menu with no keyboard way out.
-    if (m_powerWindow && m_powerWindow->isVisible())
-        return QObject::eventFilter(watched, event);
+    for (QQuickWindow *window : std::as_const(m_powerWindows)) {
+        if (window && window->isVisible())
+            return QObject::eventFilter(watched, event);
+    }
 
     auto *keyEvent = static_cast<QKeyEvent *>(event);
 
@@ -412,6 +490,16 @@ void ScreenManager::onScreenAdded(QScreen *screen)
 void ScreenManager::onScreenRemoved(QScreen *screen)
 {
     destroyWindowForScreen(screen);
+    destroyPowerWindowForScreen(screen);
+
+    if (screen == m_powerControlScreen) {
+        // The screen carrying the menu's controls is gone. Hand them to whatever
+        // screen the pointer is on rather than leaving the menu with nothing to
+        // press.
+        m_powerControlScreen = nullptr;
+        if (!m_powerWindows.isEmpty())
+            setPowerControlScreen(QGuiApplication::screenAt(QCursor::pos()));
+    }
 
     if (screen == m_authScreen) {
         // The screen that carried the password field is gone: fall back to

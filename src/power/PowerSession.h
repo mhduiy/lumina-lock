@@ -20,6 +20,12 @@ class PowerSession : public QObject
 
     Q_PROPERTY(bool visible READ visible NOTIFY Visible)
     Q_PROPERTY(QVariantList options READ options NOTIFY optionsChanged)
+    /**
+     * How far the slide has been pulled, 0 to 1. Shared on purpose: the menu has
+     * a window per screen and every one of them dims with it, but only the screen
+     * carrying the controls has a slide to pull.
+     */
+    Q_PROPERTY(qreal dimProgress READ dimProgress WRITE setDimProgress NOTIFY dimProgressChanged)
 
 public:
     explicit PowerSession(QObject *parent = nullptr);
@@ -28,6 +34,8 @@ public:
     void setScreenManager(ScreenManager *screens) { m_screens = screens; }
 
     bool visible() const { return m_visible; }
+    qreal dimProgress() const { return m_dimProgress; }
+    void setDimProgress(qreal progress);
     QVariantList options() const { return m_options; }
 
     // --- the dde-lock surface (org.deepin.dde.ShutdownFront1) ---------------
@@ -64,6 +72,7 @@ Q_SIGNALS:
     void ChangKey(const QString &key);
 
     void optionsChanged();
+    void dimProgressChanged();
     // The scene should arm this row (used when a request arrives over D-Bus).
     void armRequested(const QString &key);
     // The menu could not act, and stays up. Shown inline, then it fades.
@@ -89,6 +98,7 @@ private:
     ScreenManager *m_screens = nullptr;
 
     bool m_visible = false;
+    qreal m_dimProgress = 0;
     // Last known answers; the defaults allow everything until told otherwise.
     bool m_canShutdown = true;
     bool m_canReboot = true;

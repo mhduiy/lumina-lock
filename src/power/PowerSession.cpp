@@ -153,6 +153,15 @@ void PowerSession::refreshAvailability()
     rebuildOptions(); // the update rows are known now; the Can* land later
 }
 
+void PowerSession::setDimProgress(qreal progress)
+{
+    const qreal clamped = qBound(qreal(0), progress, qreal(1));
+    if (qFuzzyCompare(clamped, m_dimProgress))
+        return;
+    m_dimProgress = clamped;
+    Q_EMIT dimProgressChanged();
+}
+
 void PowerSession::rebuildOptions()
 {
     // Only what this machine can do. Anything unavailable is left out entirely
@@ -224,6 +233,9 @@ void PowerSession::show()
         m_screens->showPowerMenu();
 
     refreshAvailability();
+    // The slide starts where the last menu left it otherwise: every screen reads
+    // this, and the one that has the controls writes it.
+    setDimProgress(0);
     m_visible = true;
     qWarning().nospace() << "Power: show() done overDesktop=" << m_overDesktop
                          << " options=" << m_options.size()

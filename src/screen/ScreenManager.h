@@ -35,6 +35,12 @@ class ScreenManager : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString authScreenName READ authScreenName NOTIFY authScreenChanged)
+    /**
+     * Which screen carries the power menu's controls. Every screen shows the
+     * menu's dimming — the whole desktop darkens, not just one monitor — but
+     * only this one shows anything to press. It follows the pointer.
+     */
+    Q_PROPERTY(QString powerControlScreenName READ powerControlScreenName NOTIFY powerControlScreenChanged)
 
 public:
     explicit ScreenManager(QObject *parent = nullptr);
@@ -64,6 +70,9 @@ public:
     /** Name of the screen carrying the authentication UI, empty when none. */
     QString authScreenName() const;
 
+    /** Name of the screen carrying the power menu's controls, empty when none. */
+    QString powerControlScreenName() const;
+
 public slots:
     void start(bool visible = true);
     void showAll();
@@ -92,6 +101,13 @@ public slots:
     Q_INVOKABLE void clearAuth();
 
     /**
+     * The pointer moved onto this screen while the menu is up: the controls
+     * belong there now. Called from every power window's backdrop, which is why
+     * it is a no-op when that screen already has them.
+     */
+    Q_INVOKABLE void activatePowerForScreen(const QString &screenName);
+
+    /**
      * False from the moment a successful unlock starts its exit animation until
      * the next lock resets the scene: keystrokes in that window belong to the
      * desktop that is about to appear, not to the lock.
@@ -101,6 +117,14 @@ public slots:
 signals:
     /** The screen carrying the authentication UI changed (empty: none). */
     void authScreenChanged();
+
+    /**
+     * The screen carrying the power menu's controls changed. dx and dy are the
+     * direction from the old screen to the new one, as -1, 0 or 1: the controls
+     * leave one screen by the side they arrive on the other, which is what makes
+     * the two halves of the handoff read as one panel being carried across.
+     */
+    void powerControlScreenChanged(const QString &screenName, int dx, int dy);
 
 protected:
     /**
@@ -119,6 +143,9 @@ private slots:
 private:
     void createWindowForScreen(QScreen *screen);
     void destroyWindowForScreen(QScreen *screen);
+    void createPowerWindowForScreen(QScreen *screen);
+    void destroyPowerWindowForScreen(QScreen *screen);
+    void setPowerControlScreen(QScreen *screen);
     QQuickWindow *windowForScreen(const QScreen *screen) const;
     QScreen *screenByName(const QString &name) const;
     void setAuthScreen(QScreen *screen);
@@ -129,7 +156,11 @@ private:
     QQmlEngine *m_engine = nullptr;
     QUrl m_surfaceUrl;
     QUrl m_powerUrl;
-    QPointer<QQuickWindow> m_powerWindow;
+    /** One power-menu window per screen: all of them dim, one of them has the
+     *  controls. */
+    QHash<QScreen *, QPointer<QQuickWindow>> m_powerWindows;
+    /** Screen carrying the power menu's controls; nullptr while it is down. */
+    QScreen *m_powerControlScreen = nullptr;
     QHash<QScreen *, QQuickWindow *> m_windows;
     /** Screen carrying the password field; nullptr while the lock is idle. */
     QScreen *m_authScreen = nullptr;

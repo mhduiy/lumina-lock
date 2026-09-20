@@ -33,6 +33,26 @@ Item {
 
     signal activated(string key)
 
+    // --- which screen carries the controls ----------------------------------
+    // Every screen runs this surface and every one of them dims, but only the
+    // screen the pointer is on draws anything to press. Crossing to another
+    // screen carries the controls across: the one they leave runs them off
+    // toward the other, and that one brings them in from the same side a beat
+    // later. Sequential on purpose — moving both at once reads as two copies of
+    // the panel, this reads as one panel being carried between screens.
+    property string screenName: ""
+    readonly property bool controlsHere: shown
+                                         && Screens.powerControlScreenName === screenName
+    // Direction from the screen that had the controls to the one that has them.
+    property real handoffDx: 1
+    property real handoffDy: 0
+    // 0 is in place; 1 is one screen away in that direction, -1 the same on the
+    // other side. The screen arriving starts at -1 and the one leaving ends at
+    // +1, so one expression places both.
+    property real handoff: 0
+    readonly property real travelX: width * 0.5 + content.width * 0.5
+    readonly property real travelY: height * 0.5 + content.height * 0.5
+
     // 0 = the slider, 1 = the buttons. Opening focuses the first *button*, never
     // the slider: a default selection is a guess at intent, and the only guess
     // worth making is the cheapest thing on the screen. Shutting down is not one
@@ -117,7 +137,15 @@ Item {
         // dismisses the menu.
         MouseArea {
             anchors.fill: parent
-            onClicked: Power.dismiss()
+            // The pointer crossing onto another screen carries the controls
+            // there. It is the only hint of which screen the user is looking at,
+            // the same way it is for the password field.
+            hoverEnabled: true
+            onEntered: Screens.activatePowerForScreen(root.screenName)
+            // Clicking blank space dismisses the menu, but only on the screen
+            // that has something on it: anywhere else there is nothing to aim
+            // at, so a click there means nothing.
+            onClicked: if (root.controlsHere) Power.dismiss()
         }
     }
 
@@ -133,7 +161,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: "black"
-        opacity: slider.progress
+        // Shared with every other screen's window: the slide is only on one of
+        // them, but the darkening is on all of them.
+        opacity: Power.dimProgress
     }
 
     // --- content ------------------------------------------------------------
@@ -144,6 +174,10 @@ Item {
         anchors.fill: parent
         opacity: root.firing ? 0.22 : 1
         MotionBehavior on opacity { duration: 160 }
+        transform: Translate {
+            x: root.handoff * root.handoffDx * root.travelX
+            y: root.handoff * root.handoffDy * root.travelY
+        }
 
         Column {
             id: column
@@ -192,6 +226,10 @@ Item {
                     active: !drag.dragging && !fillAnim.running
                     duration: 240
                 }
+
+                // The slide dims every screen, so the progress is written to the
+                // one shared value rather than read from this slider by anyone.
+                onProgressChanged: if (root.controlsHere) Power.dimProgress = progress
 
                 Rectangle {
                     anchors.fill: parent
@@ -494,8 +532,68 @@ Item {
     }
 
     // --- behaviour ----------------------------------------------------------
+    // Out on an accelerating curve and in on a decelerating one: the panel
+    // leaves decisively and lands softly, which is what makes the two halves
+    // read as one movement rather than two.
+    NumberAnimation {
+        id: handoffAnim
+        target: root
+        property: "handoff"
+        duration: 200
+        easing.type: Easing.InCubic
+    }
+    Timer {
+        id: arriveTimer
+        // A beat after the other screen starts moving them off, so they are
+        // nearly at its edge before these pick them up.
+        interval: 170
+        onTriggered: {
+            handoffAnim.stop()
+            handoffAnim.duration = 260
+            handoffAnim.easing.type = Easing.OutCubic
+            handoffAnim.from = -1
+            handoffAnim.to = 0
+            handoffAnim.restart()
+        }
+    }
+
+    onControlsHereChanged: {
+        if (shown === false)
+            return
+        if (controlsHere) {
+            handoff = -1 // arriving, from the side the other screen is on
+            arriveTimer.restart()
+        } else {
+            arriveTimer.stop()
+            handoffAnim.stop()
+            handoffAnim.duration = 200
+            handoffAnim.easing.type = Easing.InCubic
+            handoffAnim.from = handoff
+            handoffAnim.to = 1
+            handoffAnim.restart()
+        }
+    }
+
+    Connections {
+        target: Screens
+        function onPowerControlScreenChanged(name, dx, dy) {
+            // Kept only when it says something. Two screens can share an axis —
+            // side by side is dx only, stacked is dy only — and a handoff with
+            // no direction at all would carry the controls nowhere.
+            if (dx !== 0 || dy !== 0) {
+                root.handoffDx = dx
+                root.handoffDy = dy
+            }
+        }
+    }
+
     onShownChanged: {
         if (shown) {
+            // No handoff when the menu opens: the screen that has the controls
+            // shows them in place, and the others start already out of the way.
+            handoffAnim.stop()
+            arriveTimer.stop()
+            handoff = controlsHere ? 0 : 1
             currentIndex = 0 // the cheapest button, not the slider
             focusRow = 1
             heldKey = ""

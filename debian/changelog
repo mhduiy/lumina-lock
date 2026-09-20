@@ -1,3 +1,30 @@
+lumina-lock (0.4.30) unstable; urgency=medium
+
+  * The power menu works on every screen. It used to open a single window on
+    whichever screen happened to be active; now every screen gets one, so the
+    whole desktop dims rather than one monitor, and the controls are drawn only
+    on the screen the pointer is on. That is the same rule the password field
+    follows, and for the same reason: the pointer is the only hint of which
+    screen someone is looking at.
+  * Crossing between screens carries the controls across. The screen they leave
+    runs them off toward the other one on an accelerating curve, and that one
+    brings them in from the same side on a decelerating one, a beat later. Two
+    halves, one movement — moving both at once reads as two copies of the panel
+    rather than one being carried.
+  * The dim is a single value every window reads, so pulling the slide darkens
+    all of them. On a single screen, where the value still has to travel through
+    the same path: (3,5,9) at rest, (0,0,0) with the knob all the way over.
+  * The keyboard grab follows the controls, the way it follows the password
+    field.
+  * Not yet exercised: the multi-screen path itself. Qt identifies screens
+    through XRandR outputs and the test environment has one, so it reports
+    windows=1 there and the handoff could not be triggered — the per-screen
+    window creation and the handoff animation are unproven. Worth checking on a
+    real pair: the menu dims both screens, the controls sit on the pointer's
+    screen, and dragging the pointer across carries them over in two beats.
+
+ -- Lumina <lumina@example.com>  Fri, 18 Sep 2026 18:10:00 +0800
+
 lumina-lock (0.4.29) unstable; urgency=medium
 
   * Fixed the lock screen's corner buttons swapping places as they arrived. The

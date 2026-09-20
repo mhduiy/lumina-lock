@@ -36,6 +36,10 @@ Window {
         unit: root.height / 1080
         shown: Power.visible
         instant: false
+        // Which screen this window is on. Every screen runs this surface; the
+        // one whose name matches the menu's control screen is the one that draws
+        // the controls (see ScreenManager::powerControlScreenName).
+        screenName: root.screen ? root.screen.name : ""
         onActivated: (key) => Power.activate(key)
     }
 }
