@@ -1,3 +1,46 @@
+lumina-lock (1.0.0) unstable; urgency=medium
+
+  第一阶段完成。这个版本把此前分散在各个 0.4.x 里的东西收成一个可用的整体：
+  一个视觉优先的锁屏、一个能替换 dde-lock 的 DEB、以及一个和它同源的电源菜单。
+
+  * 锁屏本体：极简场景（壁纸 + 大号时间 + 日期），磨砂玻璃字与毛玻璃面板（字形作
+    遮罩、只采样自身覆盖的那一小块壁纸，不做整屏模糊）；任意按键 / 点击 / 上滑进入
+    认证态，唤醒的那次按键直接成为密码的第一个字符；密码框有圆点弹动、错误抖动与
+    内联提示；入场与转场共用一条曲线（MotionBehavior），不会各处漂移。
+  * 壁纸：静态图片与视频动态壁纸（循环、静音），整摞用「淡出上层遮挡物」揭示，
+    进入无黑屏闪烁；N 卡机器上视频走 GStreamer 后端以启用 NVDEC 硬解（Qt 6.8 默认的
+    FFmpeg 后端按线程数分配解码 surface，4K 片源会超过驱动的 32 个上限而静默回退软解）。
+    多个动态视频可以随机抽播：每次上锁从列表里抽一个，不连续重复，列表为空或文件都
+    不在时回退内置壁纸，多屏共享同一次抽签。
+  * 控制中心集成：随包一个 dde-control-center 插件（顶级模块「锁屏壁纸」），可设置
+    壁纸类型 / 静态图 / 动态视频与封面 / 时间与日期的字重、字号、位置，写入
+    org.lumina.lock DConfig；锁屏启动时读取、驻留时实时生效，CLI 参数优先。
+  * 认证：PAM（C++ 层、worker 线程、异步），密码不落日志、用完立即擦除；挂起恢复
+    遵循电源守护进程的 SleepLock 设置。
+  * 多屏：每屏一个全屏窗口跑同一份 surface，同一时刻只有一块「活跃屏」收起时钟并
+    显示密码框；活跃屏跟随交互（点击归被点的屏，按键归指针所在的屏）；热插拔下不会
+    留下一个没有密码框、也丢了输入抓取的锁屏。尺寸全部基于窗口高度等比缩放。
+  * 输入独占与窗口集成（X11）：上锁时对认证屏的窗口做键盘抓取，Alt+Tab / Super 不再
+    切走锁屏；窗口带 _DEEPIN_LOCK_SCREEN / _DEEPIN_NET_STARTUP 属性与 dde-lock 相同的
+    窗口标志。不抓取指针——多屏下那会让「点哪块屏哪块屏进认证」失效。
+  * 常驻与 D-Bus：解锁只隐藏窗口并释放视频资源，进程不退出；以 dde-lock 同名接口
+    org.deepin.dde.LockFront1 注册 Show / ShowUserList / ShowAuth / Suspend / Hibernate
+    与 Visible 属性，DDE 各组件的调用方式完全不变。
+  * 电源菜单：dde-lock 的 org.deepin.dde.ShutdownFront1 由同一个进程持有。外观是
+    滑条 + 按钮：关机是「拖到底松手」，背景随行程压暗到最暗；其余动作是圆形图标按钮，
+    不可撤销的重启与更新变体需要按住（圆环进度），松手即取消；只有机器真能做的动作
+    才出现，更新文案取自 lastore 的 UpgradableApps 而不是策略位。锁屏右下角另有
+    切换用户与电源两个控件，只在密码界面出现，带错峰入场。
+  * DEB 与 dde-lock 替换：只接管 /usr/bin/dde-lock 一个路径（preinst 用 dpkg-divert
+    挪走原包装脚本，postrm 自动还原），不 Conflicts，因此 lightdm 登录界面不受影响；
+    其余 D-Bus service / PAM / desktop / systemd 单元复用系统现有的（它们的 Exec 都
+    指向 /usr/bin/dde-lock），另加一个 systemd drop-in 把 Type=forking 改为 simple。
+  * 已知差异：仅密码认证（不接 deepin-authenticate，无指纹 / 人脸 / UADP）；无锁屏内
+    的用户列表（ShowUserList 交给 greeter）；Wayland 下不做替换、也不做锁屏语义。
+    这些与 dde-lock 的现状一致，安全化仍待 compositor / session manager 集成。
+
+ -- Lumina <lumina@example.com>  Sun, 20 Sep 2026 11:17:45 +0800
+
 lumina-lock (0.4.30) unstable; urgency=medium
 
   * The power menu works on every screen. It used to open a single window on
