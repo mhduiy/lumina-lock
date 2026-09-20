@@ -1,6 +1,7 @@
 # Lumina Lock
 
 [![Release](https://img.shields.io/github/v/release/mhduiy/lumina-lock?style=flat-square)](https://github.com/mhduiy/lumina-lock/releases)
+[![License](https://img.shields.io/badge/license-MIT-97CA00?style=flat-square)](LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/mhduiy/lumina-lock?style=flat-square)](https://github.com/mhduiy/lumina-lock/commits/master)
 [![Contributors](https://img.shields.io/github/contributors/mhduiy/lumina-lock?style=flat-square)](https://github.com/mhduiy/lumina-lock/graphs/contributors)
 [![Issues](https://img.shields.io/github/issues/mhduiy/lumina-lock?style=flat-square)](https://github.com/mhduiy/lumina-lock/issues)
@@ -178,3 +179,13 @@ QT_QPA_PLATFORM=offscreen ./build/lumina-lock --test-exit-ms 2000   # 启动与 
 echo "wrong-password" | ./build/lumina-pam-test $(whoami)           # PAM 后端
 tests/*/run.sh                                                      # 各功能沙箱脚本
 ```
+
+## 贡献者
+
+<a href="https://github.com/mhduiy/lumina-lock/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=mhduiy/lumina-lock" alt="Contributors" />
+</a>
+
+## 许可证
+
+[MIT](LICENSE) © 2026 mhduiy
