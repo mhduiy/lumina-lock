@@ -46,6 +46,8 @@ DDE 的 dde-lock 换掉的 DEB。
 - **输入独占（X11）**：上锁时对认证屏的窗口做键盘抓取，Alt+Tab / Super 不再切走锁屏；**不抓取指针**（多屏下那会让「点哪块屏哪块屏进认证」失效）
 - **常驻**：解锁只隐藏窗口并释放视频资源，进程不退出；D-Bus 可重新上锁
 - **dde-lock D-Bus 兼容**：以 `org.deepin.dde.LockFront1` 注册，DDE 各组件的调用方式不变
+- **锁屏状态上报**：上锁 / 解锁时调用 `org.deepin.dde.SessionManager1.SetLocked`，logind、电源管理与
+  `dde-quick-login` 看到的锁屏状态与画面一致；`-lq`（快速登录）因此能正常走完，而不是等超时被登出
 - 挂起恢复遵循电源守护进程的 `SleepLock` 设置；HiDPI 友好，尺寸全部基于窗口高度等比缩放
 
 **电源菜单**
@@ -93,6 +95,7 @@ cmake -B build && cmake --build build
 
 ./build/lumina-lock                      # 立即上锁并常驻
 ./build/lumina-lock --daemon             # 后台常驻，等 D-Bus Show() 再上锁
+./build/lumina-lock -lq                  # dde-quick-login 的启动方式（快速登录，隐含 -l）
 ./build/lumina-lock --wallpaper a.jpg    # 静态壁纸
 ./build/lumina-lock --video a.mp4 --poster cover.jpg
 ./build/lumina-lock --pam-service dde-lock --user $USER
@@ -177,7 +180,8 @@ C++ 负责系统能力、认证、状态与资源；QML 负责 UI 与动画。�
 ```bash
 QT_QPA_PLATFORM=offscreen ./build/lumina-lock --test-exit-ms 2000   # 启动与 QML 加载
 echo "wrong-password" | ./build/lumina-pam-test $(whoami)           # PAM 后端
-tests/*/run.sh                                                      # 各功能沙箱脚本
+bash tests/lock-state-report/run.sh                                 # 锁屏状态上报（快速登录依赖）
+tests/*/run.sh                                                      # 其余各功能沙箱脚本
 ```
 
 ## 贡献者

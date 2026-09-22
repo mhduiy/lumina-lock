@@ -91,6 +91,25 @@ target_include_directories(lumina-pam-test PRIVATE
 )
 target_link_libraries(lumina-pam-test PRIVATE Qt6::Core ${PAM_LIBRARY})
 
+# The lock-state report dde-quick-login depends on (LockSession::reportLockState).
+# Needs a session bus of its own, so run it under dbus-run-session.
+qt_add_executable(lumina-lock-state-test
+    tests/lock-state-report/main.cpp
+    src/auth/PamAuthenticator.cpp
+    src/auth/PamAuthenticator.h
+    src/session/LockSession.cpp
+    src/session/LockSession.h
+    src/session/dbusnames.h
+)
+if(DSS_SNIPE)
+    target_compile_definitions(lumina-lock-state-test PRIVATE DSS_SNIPE=1)
+endif()
+target_include_directories(lumina-lock-state-test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${PAM_INCLUDE_DIR}
+)
+target_link_libraries(lumina-lock-state-test PRIVATE Qt6::Core Qt6::DBus ${PAM_LIBRARY})
+
 install(TARGETS lumina-lock RUNTIME DESTINATION bin)
 
 # DConfig schema for the wallpaper settings (control-center integration).

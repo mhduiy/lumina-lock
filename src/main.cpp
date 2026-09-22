@@ -70,6 +70,14 @@ int main(int argc, char *argv[])
     const QCommandLineOption lockOpt(
         {QStringLiteral("l"), QStringLiteral("lock")},
         QStringLiteral("Lock the screen now."));
+    // dde-quick-login starts the lock as `/usr/bin/dde-lock -lq`, and dde-lock's
+    // own -q/--quicklogin is what tells it to lock even for an account with no
+    // password. `-l` already locks here, so the flag mainly has to be *accepted*
+    // — but it implies the lock on its own, so a bare `-q` cannot silently leave
+    // the session uncovered.
+    const QCommandLineOption quickLoginOpt(
+        {QStringLiteral("q"), QStringLiteral("quicklogin")},
+        QStringLiteral("Show the lock for the quick-login flow (implies -l)."));
     const QCommandLineOption showUserListOpt(
         QStringLiteral("show-user-list"),
         QStringLiteral("Show the user list (mapped to showing the lock)."));
@@ -82,6 +90,7 @@ int main(int argc, char *argv[])
     parser.addOption(testExitOpt);
     parser.addOption(daemonOpt);
     parser.addOption(lockOpt);
+    parser.addOption(quickLoginOpt);
     parser.addOption(showUserListOpt);
     parser.process(app);
 
@@ -127,8 +136,8 @@ int main(int argc, char *argv[])
     }
 
     // Resident daemon starts hidden and waits for Show() (matches dde-lock's
-    // --daemon behaviour); a plain/`-l` launch locks immediately.
-    const bool startHidden = parser.isSet(daemonOpt);
+    // --daemon behaviour); a plain/`-l`/`-q` launch locks immediately.
+    const bool startHidden = parser.isSet(daemonOpt) && !parser.isSet(quickLoginOpt);
     if (startHidden)
         session.setLocked(false);
 
@@ -204,6 +213,14 @@ int main(int argc, char *argv[])
 
     // dde-lock compatible surface.
     bus.registerObject(LOCK_FRONT_PATH, &session, QDBusConnection::ExportAdaptors);
+
+    // This process is the lock front now. A `-lq` launch *starts* locked and never
+    // transitions, so the report dde-quick-login is waiting for has to be sent
+    // here or not at all. A daemon start is unlocked and says nothing, matching
+    // dde-lock: the session manager's Locked is already false, and there is no
+    // transition to announce.
+    if (session.locked())
+        session.reportLockState();
 
     // The power menu's surface. DDE reaches it through the ShutdownFront1
     // .service file, which activates this same binary, so the dock's power

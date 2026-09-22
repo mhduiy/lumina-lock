@@ -126,6 +126,7 @@ void LockSession::unlock()
     emit lockedChanged(false);
     emit Visible(false);
     emit unlocked();
+    reportLockState();
 }
 
 void LockSession::lock()
@@ -135,6 +136,47 @@ void LockSession::lock()
     m_locked = true;
     emit lockedChanged(true);
     emit Visible(true);
+    reportLockState();
+}
+
+// DDE's session manager is the authority on whether the session is locked:
+// logind, power management and — the reason this call exists — dde-quick-login
+// all read it. Quick login starts the lock with `-lq` and only sends READY=1 to
+// systemd (cancelling the timer that would log the user straight back out) once
+// LockedChanged(true) arrives, so a lock that never reports leaves the session
+// looking unlocked and gets the login thrown away.
+//
+// dde-session accepts the call only from a process whose cmdline starts with
+// /usr/bin/dde-lock (see SessionManager::SetLocked) — the path this package
+// takes over — and drops anything else *silently*. A build run straight out of
+// ./build therefore cannot report, and nothing on this side can tell.
+void LockSession::reportLockState()
+{
+    if (m_reportedLockState == int(m_locked))
+        return;
+    m_reportedLockState = int(m_locked);
+
+    QDBusInterface ifc(SESSION_MGR_SERVICE, SESSION_MGR_PATH, SESSION_MGR_INTERFACE,
+                       QDBusConnection::sessionBus());
+    if (!ifc.isValid()) {
+        qWarning().noquote() << "LockSession:" << SESSION_MGR_SERVICE
+                             << "is not available; DDE will not be told the session is"
+                             << (m_locked ? "locked" : "unlocked");
+        return;
+    }
+
+    auto *watcher = new QDBusPendingCallWatcher(
+        ifc.asyncCall(QStringLiteral("SetLocked"), m_locked), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher] {
+        const QDBusPendingReply<> reply = *watcher;
+        watcher->deleteLater();
+        if (!reply.isError())
+            return;
+        qWarning().noquote() << "LockSession: SetLocked failed:" << reply.error().message();
+        // Forget the attempt so the next transition tries again, rather than the
+        // session being reported wrong for the rest of its life.
+        m_reportedLockState = -1;
+    });
 }
 
 void LockSession::show()

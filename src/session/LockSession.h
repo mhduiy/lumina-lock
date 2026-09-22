@@ -41,6 +41,21 @@ public:
     /** Set the initial lock state before the UI is created (startup only). */
     void setLocked(bool locked) { m_locked = locked; }
 
+    /**
+     * Tell the session manager whether this session is locked.
+     *
+     * org.deepin.dde.SessionManager1 is the authority the rest of DDE reads:
+     * logind, power management, and dde-quick-login — which starts the lock with
+     * `-lq` and only reports the login as good once LockedChanged(true) arrives.
+     * dde-lock does this from LockWorker::setLocked(); without it the session
+     * stays "unlocked" for DDE while the screen is covered.
+     *
+     * Sent on every lock/unlock transition. main() also calls it once the lock
+     * front is owned, because a quick-login launch *starts* locked and so never
+     * transitions.
+     */
+    void reportLockState();
+
     /** Override the target user (CLI --user). */
     void setUser(const QString &user);
 
@@ -98,5 +113,8 @@ private:
     QString m_hostName;
     bool m_authenticating = false;
     bool m_locked = true;
+    // The state the session manager was last told about, so a transition that
+    // does not move it (and the startup call on top of one) stays quiet.
+    int m_reportedLockState = -1;
     QString m_errorMessage;
 };
