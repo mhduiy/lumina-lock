@@ -41,8 +41,11 @@ Item {
     // later. Sequential on purpose — moving both at once reads as two copies of
     // the panel, this reads as one panel being carried between screens.
     property string screenName: ""
-    readonly property bool controlsHere: shown
-                                         && Screens.powerControlScreenName === screenName
+    // Which screen the controls belong to, *independently of whether the menu is
+    // up*. The handoff below is about the controls moving between screens, and
+    // the menu opening is not a move.
+    readonly property bool controlsOnThisScreen: Screens.powerControlScreenName === screenName
+    readonly property bool controlsHere: shown && controlsOnThisScreen
     // Direction from the screen that had the controls to the one that has them.
     property real handoffDx: 1
     property real handoffDy: 0
@@ -557,10 +560,14 @@ Item {
         }
     }
 
-    onControlsHereChanged: {
+    // The controls moving between screens. Deliberately not tied to
+    // `controlsHere`: that one flips on every open and close as well, so the
+    // menu opening was read as an arrival and the panel slid in from the side
+    // every time it was opened.
+    onControlsOnThisScreenChanged: {
         if (shown === false)
             return
-        if (controlsHere) {
+        if (controlsOnThisScreen) {
             handoff = -1 // arriving, from the side the other screen is on
             arriveTimer.restart()
         } else {
@@ -593,7 +600,12 @@ Item {
             // shows them in place, and the others start already out of the way.
             handoffAnim.stop()
             arriveTimer.stop()
-            handoff = controlsHere ? 0 : 1
+            // Read the screen directly rather than through `controlsHere`: that
+            // binding depends on `shown` and has not been re-evaluated yet in
+            // this turn, so it still reports what it reported while the menu was
+            // down — which parked the panel off-screen and made the arrival
+            // animation run on every open.
+            handoff = controlsOnThisScreen ? 0 : 1
             currentIndex = 0 // the cheapest button, not the slider
             focusRow = 1
             heldKey = ""
