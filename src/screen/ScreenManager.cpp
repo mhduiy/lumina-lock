@@ -60,6 +60,23 @@ void markAsLockWindow(QQuickWindow *window)
 constexpr int kMaxGrabRetries = 10;
 constexpr int kGrabRetryIntervalMs = 120;
 
+// dde-lock re-asserts a window's geometry for two seconds after a screen change
+// (FullScreenBackground::setddeGeometry, 200ms apart). The notification can
+// arrive before the X server has finished resizing the screen, and the first
+// setGeometry is then clamped to the old size with nothing left to correct it —
+// which looks exactly like the change never arrived. Same interval and duration.
+constexpr int kGeometrySettleIntervalMs = 200;
+constexpr int kGeometrySettleTicks = 10;
+
+void resizeToScreen(QQuickWindow *window, QScreen *screen, const QRect &rect)
+{
+    if (!window || window->geometry() == rect)
+        return;
+    qWarning().nospace() << "ScreenManager: resizing " << window->title() << " on "
+                         << screen->name() << " to " << rect.width() << "x" << rect.height();
+    window->setGeometry(rect);
+}
+
 } // namespace
 
 ScreenManager::ScreenManager(QObject *parent)
@@ -67,6 +84,10 @@ ScreenManager::ScreenManager(QObject *parent)
 {
     // Key handling is a per-window event filter; see createWindowForScreen()
     // and eventFilter() for why it must not be installed application-wide.
+
+    m_geometrySettleTimer = new QTimer(this);
+    m_geometrySettleTimer->setInterval(kGeometrySettleIntervalMs);
+    connect(m_geometrySettleTimer, &QTimer::timeout, this, &ScreenManager::settleScreenGeometry);
 }
 
 void ScreenManager::setEngine(QQmlEngine *engine)
@@ -164,6 +185,7 @@ void ScreenManager::createPowerWindowForScreen(QScreen *screen)
     window->setGeometry(screen->geometry());
     window->installEventFilter(this);
     m_powerWindows.insert(screen, window);
+    watchScreenGeometry(screen);
 }
 
 void ScreenManager::destroyPowerWindowForScreen(QScreen *screen)
@@ -491,6 +513,7 @@ void ScreenManager::onScreenRemoved(QScreen *screen)
 {
     destroyWindowForScreen(screen);
     destroyPowerWindowForScreen(screen);
+    m_watchedScreens.remove(screen);
 
     if (screen == m_powerControlScreen) {
         // The screen carrying the menu's controls is gone. Hand them to whatever
@@ -514,6 +537,54 @@ void ScreenManager::onScreenRemoved(QScreen *screen)
     // screen that held the grab (or the whole primary screen) just went away.
     chooseGrabWindow();
     applyKeyboardGrab();
+}
+
+void ScreenManager::watchScreenGeometry(QScreen *screen)
+{
+    if (!screen || m_watchedScreens.contains(screen))
+        return;
+
+    m_watchedScreens.insert(screen);
+    // One signal, matching dde-lock (FullScreenBackground::updateScreen). A scale
+    // change lands here too: it moves the screen's *logical* geometry, which is
+    // what a window has to cover, so the platform plugin reports it the same way
+    // as a resolution change.
+    connect(screen, &QScreen::geometryChanged, this, [this, screen] {
+        onScreenGeometryChanged(screen);
+    });
+}
+
+void ScreenManager::onScreenGeometryChanged(QScreen *screen)
+{
+    if (!screen)
+        return;
+
+    qWarning().nospace() << "ScreenManager: screen " << screen->name() << " is now "
+                         << screen->geometry().width() << "x" << screen->geometry().height();
+    applyScreenGeometry(screen);
+
+    // Keep re-asserting for a moment; see kGeometrySettleTicks.
+    m_geometrySettleTicks = 0;
+    m_geometrySettleTimer->start();
+}
+
+void ScreenManager::applyScreenGeometry(QScreen *screen)
+{
+    if (!screen)
+        return;
+
+    const QRect rect = screen->geometry();
+    resizeToScreen(m_windows.value(screen), screen, rect);
+    resizeToScreen(m_powerWindows.value(screen), screen, rect);
+}
+
+void ScreenManager::settleScreenGeometry()
+{
+    for (QScreen *screen : std::as_const(m_watchedScreens))
+        applyScreenGeometry(screen);
+
+    if (++m_geometrySettleTicks >= kGeometrySettleTicks)
+        m_geometrySettleTimer->stop();
 }
 
 void ScreenManager::createWindowForScreen(QScreen *screen)
@@ -553,6 +624,7 @@ void ScreenManager::createWindowForScreen(QScreen *screen)
     }
 
     m_windows.insert(screen, window);
+    watchScreenGeometry(screen);
     if (!m_grabWindow)
         chooseGrabWindow();
 

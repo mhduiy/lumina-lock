@@ -3,6 +3,7 @@
 #include <QHash>
 #include <QObject>
 #include <QPointer>
+#include <QSet>
 #include <QString>
 #include <QUrl>
 
@@ -10,6 +11,7 @@ class QQmlEngine;
 class QKeyEvent;
 class QQuickWindow;
 class QScreen;
+class QTimer;
 
 /**
  * Creates and owns one fullscreen window per physical screen.
@@ -153,6 +155,20 @@ private:
     void applyKeyboardGrab();
     static QString printableText(const QKeyEvent *event);
 
+    /**
+     * Screen geometry and scale changes.
+     *
+     * Every window here is sized from its screen rather than by the window
+     * manager — they are override-redirect, so nothing else will resize them —
+     * which means a resolution or scale change leaves them drawing into the size
+     * the screen used to have until someone says otherwise. One watcher per
+     * screen; both the lock's window and the menu's follow it.
+     */
+    void watchScreenGeometry(QScreen *screen);
+    void onScreenGeometryChanged(QScreen *screen);
+    void applyScreenGeometry(QScreen *screen);
+    void settleScreenGeometry();
+
     QQmlEngine *m_engine = nullptr;
     QUrl m_surfaceUrl;
     QUrl m_powerUrl;
@@ -168,6 +184,11 @@ private:
     QPointer<QQuickWindow> m_grabWindow;
     QString m_pendingText;
     int m_grabRetries = 0;
+    /** Screens whose geometry changes are watched. */
+    QSet<QScreen *> m_watchedScreens;
+    /** Re-asserts the windows' geometry while a screen change settles. */
+    QTimer *m_geometrySettleTimer = nullptr;
+    int m_geometrySettleTicks = 0;
     bool m_visible = true;
     bool m_grabInput = false;
     bool m_interactive = true;

@@ -48,6 +48,8 @@ DDE 的 dde-lock 换掉的 DEB。
 - **dde-lock D-Bus 兼容**：以 `org.deepin.dde.LockFront1` 注册，DDE 各组件的调用方式不变
 - **锁屏状态上报**：上锁 / 解锁时调用 `org.deepin.dde.SessionManager1.SetLocked`，logind、电源管理与
   `dde-quick-login` 看到的锁屏状态与画面一致；`-lq`（快速登录）因此能正常走完，而不是等超时被登出
+- **分辨率 / 缩放变化跟随**：窗口是按屏幕几何摆的，且是 override-redirect，所以屏幕一变就自己重新摆；
+  并像 dde-lock 一样在变化后两秒内反复重设，避开「后端还没改完、第一次设置被夹回旧尺寸」。锁屏与电源页都跟随
 - 挂起恢复遵循电源守护进程的 `SleepLock` 设置；HiDPI 友好，尺寸全部基于窗口高度等比缩放
 
 **电源菜单**
@@ -181,6 +183,7 @@ C++ 负责系统能力、认证、状态与资源；QML 负责 UI 与动画。�
 QT_QPA_PLATFORM=offscreen ./build/lumina-lock --test-exit-ms 2000   # 启动与 QML 加载
 echo "wrong-password" | ./build/lumina-pam-test $(whoami)           # PAM 后端
 bash tests/lock-state-report/run.sh                                 # 锁屏状态上报（快速登录依赖）
+bash tests/screen-geometry/run.sh                                   # 分辨率变化后页面跟随（需 Xvfb + Xephyr）
 tests/*/run.sh                                                      # 其余各功能沙箱脚本
 ```
 
