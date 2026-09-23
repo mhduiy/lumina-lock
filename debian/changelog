@@ -1,3 +1,18 @@
+lumina-lock (0.4.31) unstable; urgency=medium
+
+  * The control center plugin has an icon of its own again, and it no longer
+    takes the system's with it. It was borrowing `dcc_wallpaper` — the icon name
+    the system's own wallpaper module uses — which shadowed that module's icon.
+    It uses the plugin's own name now (qml/luminalock.svg).
+  * That borrowing had a reason, recorded in the file: the plugin's own icon came
+    out as a small off-centre patch. The cause is visible in the artwork — it
+    spans x 117..779 of a 1024-wide canvas, so it is 662x1024 and off to the
+    left, and a square icon cell shrinks it to fit the taller side. The canvas is
+    re-framed around the shape and centred, so it fills the height in any square
+    cell.
+
+ -- Lumina <lumina@example.com>  Sun, 20 Sep 2026 11:35:00 +0800
+
 lumina-lock (1.0.0) unstable; urgency=medium
 
   第一阶段完成。这个版本把此前分散在各个 0.4.x 里的东西收成一个可用的整体：
