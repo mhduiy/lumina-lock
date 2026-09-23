@@ -1,27 +1,22 @@
-lumina-lock (0.4.32) unstable; urgency=medium
+lumina-lock (1.0.1) unstable; urgency=medium
 
-  * Rebuilt. The 0.4.31 entry carried the wrong date — 20 September where the
-    build was on the 23rd — and dpkg stamps the package's files with the
-    changelog date, so an installed 0.4.31 had files dated three days early.
-    Nothing else changed; the version is bumped rather than rebuilt in place so
-    that one version still means one build.
-
- -- Lumina <lumina@example.com>  Wed, 23 Sep 2026 14:20:00 +0800
-
-lumina-lock (0.4.31) unstable; urgency=medium
-
+  * Released over 1.0.0 rather than beside it. The two entries that were here
+    were numbered 0.4.31 and 0.4.32 because this file's top line was read and
+    bumped without looking at the tags: v1.0.0 had already been released, so
+    those numbers sort *below* it and a package built from them is refused as a
+    downgrade. Numbering from the tag is what should have happened.
   * The control center plugin has an icon of its own again, and it no longer
     takes the system's with it. It was borrowing `dcc_wallpaper` — the icon name
     the system's own wallpaper module uses — which shadowed that module's icon.
-    It uses the plugin's own name now (qml/luminalock.svg).
-  * That borrowing had a reason, recorded in the file: the plugin's own icon came
-    out as a small off-centre patch. The cause is visible in the artwork — it
-    spans x 117..779 of a 1024-wide canvas, so it is 662x1024 and off to the
-    left, and a square icon cell shrinks it to fit the taller side. The canvas is
-    re-framed around the shape and centred, so it fills the height in any square
-    cell.
+    It uses the plugin's own name now. The borrowing had a reason: the plugin's
+    own icon came out as a small off-centre patch, because the artwork spans
+    x 117..779 of a 1024-wide canvas and a square cell scales it to fit the taller
+    side. The canvas is re-framed around the shape and centred.
+  * Also in this release, from the branch: the lock accepts -lq and reports its
+    lock state; the lock surfaces follow resolution and scale changes; and the
+    power menu no longer plays a handoff when it is simply opening.
 
- -- Lumina <lumina@example.com>  Wed, 23 Sep 2026 11:50:00 +0800
+ -- Lumina <lumina@example.com>  Wed, 23 Sep 2026 15:51:02 +0800
 
 lumina-lock (1.0.0) unstable; urgency=medium
 
