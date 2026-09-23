@@ -1,3 +1,13 @@
+lumina-lock (0.4.32) unstable; urgency=medium
+
+  * Rebuilt. The 0.4.31 entry carried the wrong date — 20 September where the
+    build was on the 23rd — and dpkg stamps the package's files with the
+    changelog date, so an installed 0.4.31 had files dated three days early.
+    Nothing else changed; the version is bumped rather than rebuilt in place so
+    that one version still means one build.
+
+ -- Lumina <lumina@example.com>  Wed, 23 Sep 2026 14:20:00 +0800
+
 lumina-lock (0.4.31) unstable; urgency=medium
 
   * The control center plugin has an icon of its own again, and it no longer
@@ -11,7 +21,7 @@ lumina-lock (0.4.31) unstable; urgency=medium
     re-framed around the shape and centred, so it fills the height in any square
     cell.
 
- -- Lumina <lumina@example.com>  Sun, 20 Sep 2026 11:35:00 +0800
+ -- Lumina <lumina@example.com>  Wed, 23 Sep 2026 11:50:00 +0800
 
 lumina-lock (1.0.0) unstable; urgency=medium
 
