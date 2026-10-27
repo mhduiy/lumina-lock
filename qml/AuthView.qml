@@ -164,8 +164,13 @@ Item {
 
     function focusField(initialText) {
         field.focusField()
-        // A printable key that woke the lock starts the password.
-        field.appendText(initialText)
+        // A printable key that woke the lock starts the password — unless the
+        // user turned that off, in which case the wake key is dropped here and
+        // the field opens empty. Decided at the point of use (not in the caller)
+        // so a setting changed in the control center applies to the very next
+        // wake without a restart.
+        if (LockAppearance.wakeFillPassword)
+            field.appendText(initialText)
     }
 
     function clearAndShake() {

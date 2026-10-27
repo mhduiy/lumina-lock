@@ -61,6 +61,7 @@ int main(int argc, char **argv)
     const QString kType = QStringLiteral("wallpaperType");
     const QString kAlignX = QStringLiteral("clockPositionX");
     const QString kAlignY = QStringLiteral("clockPositionY");
+    const QString kWakeFill = QStringLiteral("wakeFillPassword");
 
     if (mode == QLatin1String("defaults")) {
         // 全新沙箱：没写过任何值时，schema 默认值要能读出来。
@@ -72,6 +73,9 @@ int main(int argc, char **argv)
         check(cfg->value(kType).toString() == QLatin1String("none"),
               QStringLiteral("wallpaperType 默认 none"),
               QStringLiteral("-> %1").arg(cfg->value(kType).toString()));
+        // 默认开着：唤醒按键就是密码的第一个字符（这次改动之前的行为）。
+        check(cfg->value(kWakeFill).toBool(), QStringLiteral("wakeFillPassword 默认 true"),
+              QStringLiteral("-> %1").arg(cfg->value(kWakeFill).toBool()));
     } else if (mode == QLatin1String("write")) {
         // 控制中心「添加视频」+ 调取景 + 选类型，写的就是这几条。
         say(QStringLiteral("写入（模拟控制中心操作）:"));
@@ -81,7 +85,9 @@ int main(int argc, char **argv)
         cfg->setValue(kAlignX, 30);
         cfg->setValue(kAlignY, 70);
         cfg->setValue(kType, QStringLiteral("video-random"));
-        check(true, QStringLiteral("已写入 3 个视频路径 / 取景 30,70 / 类型 video-random"));
+        // 控制中心关掉「唤醒按键填入密码框」。
+        cfg->setValue(kWakeFill, false);
+        check(true, QStringLiteral("已写入 3 个视频路径 / 取景 30,70 / 类型 video-random / 唤醒填密码 false"));
     } else if (mode == QLatin1String("read")) {
         say(QStringLiteral("另一个进程读回:"));
         const QStringList expect{QStringLiteral("/tmp/a.mp4"), QStringLiteral("/tmp/b.mp4"),
@@ -95,6 +101,8 @@ int main(int argc, char **argv)
         check(cfg->value(kType).toString() == QLatin1String("video-random"),
               QStringLiteral("类型 video-random 一致"),
               QStringLiteral("-> %1").arg(cfg->value(kType).toString()));
+        check(!cfg->value(kWakeFill).toBool(), QStringLiteral("wakeFillPassword 读回 false"),
+              QStringLiteral("-> %1").arg(cfg->value(kWakeFill).toBool()));
     } else if (mode == QLatin1String("align")) {
         // 只改取景值：用来触发锁屏的 live reload（changed() → applyTo → 再抽一次签）
         const int x = argc > 2 ? QString::fromLocal8Bit(argv[2]).toInt() : 50;
@@ -113,13 +121,17 @@ int main(int argc, char **argv)
         // 「删到空」/「重置默认」走的是空列表。
         say(QStringLiteral("清空列表（模拟删到空 / 重置）:"));
         cfg->setValue(kPool, QStringList());
-        check(true, QStringLiteral("已写入空列表"));
+        // 「恢复默认」把密码框行为也带回默认（开）。
+        cfg->setValue(kWakeFill, true);
+        check(true, QStringLiteral("已写入空列表 / 唤醒填密码 true"));
     } else if (mode == QLatin1String("read-clear")) {
         say(QStringLiteral("另一个进程读回:"));
         check(cfg->value(kPool).toStringList().isEmpty(), QStringLiteral("videoPaths 为空"),
               list(cfg->value(kPool)));
         check(cfg->value(kAlignX).toInt() == 30, QStringLiteral("位置值不受影响"),
               QStringLiteral("-> %1").arg(cfg->value(kAlignX).toInt()));
+        check(cfg->value(kWakeFill).toBool(), QStringLiteral("wakeFillPassword 回到 true"),
+              QStringLiteral("-> %1").arg(cfg->value(kWakeFill).toBool()));
     } else {
         say(QStringLiteral("  FAIL 未知模式 %1").arg(mode));
         return 1;

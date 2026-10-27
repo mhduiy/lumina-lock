@@ -21,6 +21,7 @@ const QString kClockWeightKey = QStringLiteral("clockWeight");
 const QString kDateWeightKey = QStringLiteral("dateWeight");
 const QString kClockSizeKey = QStringLiteral("clockFontSize");
 const QString kDateSizeKey = QStringLiteral("dateFontSize");
+const QString kWakeFillKey = QStringLiteral("wakeFillPassword");
 
 constexpr int kPositionDefault = 50;
 } // namespace
@@ -52,6 +53,8 @@ void Luminalock::reload()
     m_dateWeight = configValue(kDateWeightKey, QStringLiteral("medium")).toString();
     m_clockFontSize = configValue(kClockSizeKey, 150).toInt();
     m_dateFontSize = configValue(kDateSizeKey, 27).toInt();
+    const QVariant wake = configValue(kWakeFillKey, true);
+    m_wakeFillPassword = wake.isValid() ? wake.toBool() : true;
     Q_EMIT wallpaperTypeChanged(m_wallpaperType);
     Q_EMIT wallpaperPathChanged(m_wallpaperPath);
     Q_EMIT videoPathChanged(m_videoPath);
@@ -63,6 +66,7 @@ void Luminalock::reload()
     Q_EMIT dateWeightChanged(m_dateWeight);
     Q_EMIT clockFontSizeChanged(m_clockFontSize);
     Q_EMIT dateFontSizeChanged(m_dateFontSize);
+    Q_EMIT wakeFillPasswordChanged(m_wakeFillPassword);
 }
 
 void Luminalock::setConfigValue(const QString &key, const QVariant &value)
@@ -235,6 +239,11 @@ void Luminalock::setDateFontSize(int size)
     setConfigValue(kDateSizeKey, size);
 }
 
+void Luminalock::setWakeFillPassword(bool fill)
+{
+    setConfigValue(kWakeFillKey, fill);
+}
+
 void Luminalock::resetToDefault()
 {
     m_config->setValue(kTypeKey, QStringLiteral("none"));
@@ -248,6 +257,7 @@ void Luminalock::resetToDefault()
     m_config->setValue(kDateWeightKey, QStringLiteral("medium"));
     m_config->setValue(kClockSizeKey, 150);
     m_config->setValue(kDateSizeKey, 27);
+    m_config->setValue(kWakeFillKey, true);
     reload();
 }
 

@@ -38,6 +38,12 @@ class Luminalock : public QObject
     Q_PROPERTY(int clockFontSize READ clockFontSize NOTIFY clockFontSizeChanged)
     Q_PROPERTY(int dateFontSize READ dateFontSize NOTIFY dateFontSizeChanged)
     /**
+     * Whether a keystroke that wakes the lock is typed into the password field
+     * (`wakeFillPassword`). On by default: the key that woke the lock is the
+     * password's first character.
+     */
+    Q_PROPERTY(bool wakeFillPassword READ wakeFillPassword NOTIFY wakeFillPasswordChanged)
+    /**
      * Why the last action failed, in a form fit for the dialog to show. Empty
      * after a successful one. Needed because DConfig::setValue() returns void in
      * dtk6: a key the installed schema does not have is refused by the daemon
@@ -60,6 +66,7 @@ public:
     QString dateWeight() const { return m_dateWeight; }
     int clockFontSize() const { return m_clockFontSize; }
     int dateFontSize() const { return m_dateFontSize; }
+    bool wakeFillPassword() const { return m_wakeFillPassword; }
     QString lastError() const { return m_lastError; }
 
     Q_INVOKABLE void setType(const QString &type);
@@ -74,6 +81,7 @@ public:
     Q_INVOKABLE void setDateWeight(const QString &weight);
     Q_INVOKABLE void setClockFontSize(int size);
     Q_INVOKABLE void setDateFontSize(int size);
+    Q_INVOKABLE void setWakeFillPassword(bool fill);
     Q_INVOKABLE void resetToDefault();
 
 Q_SIGNALS:
@@ -88,6 +96,7 @@ Q_SIGNALS:
     void dateWeightChanged(const QString &weight);
     void clockFontSizeChanged(int size);
     void dateFontSizeChanged(int size);
+    void wakeFillPasswordChanged(bool fill);
     void lastErrorChanged(const QString &error);
 
 private:
@@ -120,6 +129,7 @@ private:
     QString m_dateWeight;
     int m_clockFontSize = 150;
     int m_dateFontSize = 27;
+    bool m_wakeFillPassword = true;
     QString m_lastError;
 };
 

@@ -102,6 +102,16 @@
             "permissions": "readwrite",
             "visibility": "private"
         },
+        "wakeFillPassword": {
+            "value": true,
+            "serial": 0,
+            "flags": [],
+            "name": "Type the wake key into the password field",
+            "name[zh_CN]": "唤醒按键填入密码框",
+            "description": "锁屏时按任意可打印字符唤醒密码界面，是否把该字符直接填入密码框。开启（默认）时按键即为密码的第一个字符；关闭时只切换到密码界面，密码框保持为空，全部密码需要手输。",
+            "permissions": "readwrite",
+            "visibility": "private"
+        },
         "clockPositionY": {
             "value": 50,
             "serial": 0,

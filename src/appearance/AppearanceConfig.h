@@ -33,6 +33,17 @@ class AppearanceConfig : public QObject
      */
     Q_PROPERTY(qreal clockPositionX READ clockPositionX NOTIFY changed)
     Q_PROPERTY(qreal clockPositionY READ clockPositionY NOTIFY changed)
+    /**
+     * Whether the printable key that wakes the password field is typed into it.
+     * On (the default) the wake key is the password's first character, so
+     * pressing "1" on the idle lock lands in the field; off, the key only brings
+     * the field up and the whole password is typed by hand.
+     *
+     * It lives here rather than with a keyboard setting because the password
+     * field is what it controls, and the lock already reads its UI state from
+     * this one source.
+     */
+    Q_PROPERTY(bool wakeFillPassword READ wakeFillPassword NOTIFY changed)
 
 public:
     explicit AppearanceConfig(QObject *parent = nullptr);
@@ -44,6 +55,7 @@ public:
     int dateFontSize() const { return m_dateFontSize; }
     qreal clockPositionX() const { return m_clockPositionX; }
     qreal clockPositionY() const { return m_clockPositionY; }
+    bool wakeFillPassword() const { return m_wakeFillPassword; }
 
 signals:
     void changed();
@@ -67,4 +79,7 @@ private:
     int m_dateFontSize = 27;
     qreal m_clockPositionX = 0.5;
     qreal m_clockPositionY = 0.5;
+    // The behaviour before this was configurable: a keystroke that wakes the
+    // lock is also its first password character.
+    bool m_wakeFillPassword = true;
 };

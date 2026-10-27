@@ -54,6 +54,14 @@ public:
      */
     void setEngine(QQmlEngine *engine);
 
+    /**
+     * Whether the character that wakes the lock is handed to the password
+     * field (`wakeFillPassword` in DConfig). Off: the key only brings the field
+     * up. Wired to AppearanceConfig in main() so a control-center switch
+     * applies to the next keystroke, without a restart.
+     */
+    void setWakeFillPassword(bool fill);
+
     /** The single QML surface every screen runs. */
     void setSurfaceUrl(const QUrl &url) { m_surfaceUrl = url; }
 
@@ -183,6 +191,12 @@ private:
     /** Window holding the X11 keyboard grab, and the keys with it. */
     QPointer<QQuickWindow> m_grabWindow;
     QString m_pendingText;
+    /**
+     * Whether the character that wakes the lock should reach the password
+     * field at all (`wakeFillPassword` in DConfig). Defaults to the behaviour
+     * before it was configurable.
+     */
+    bool m_fillWakeText = true;
     int m_grabRetries = 0;
     /** Screens whose geometry changes are watched. */
     QSet<QScreen *> m_watchedScreens;

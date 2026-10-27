@@ -15,6 +15,7 @@ const QString kClockSizeKey = QStringLiteral("clockFontSize");
 const QString kDateSizeKey = QStringLiteral("dateFontSize");
 const QString kPositionXKey = QStringLiteral("clockPositionX");
 const QString kPositionYKey = QStringLiteral("clockPositionY");
+const QString kWakeFillKey = QStringLiteral("wakeFillPassword");
 
 // Reference pixels at a 1080px-tall screen. Bounds are enforced here rather
 // than trusted from the config: a hand-edited value must not be able to shrink
@@ -88,9 +89,16 @@ void AppearanceConfig::reload()
                                  kDateSizeMin, kDateSizeMax);
     const qreal posX = positionFactor(configValue(kPositionXKey, kPositionDefault).toInt());
     const qreal posY = positionFactor(configValue(kPositionYKey, kPositionDefault).toInt());
+    // is_valid on the variant: a key pulled by hand that is not a boolean
+    // ("false" as a string, an int) would otherwise read as true, and silently
+    // turning the feature back on is worse than falling back to its default.
+    const QVariant wake = configValue(kWakeFillKey, m_wakeFillPassword);
+    const bool wakeFill = wake.isValid() && wake.canConvert<bool>()
+        ? wake.toBool() : m_wakeFillPassword;
     if (clock == m_clockWeight && date == m_dateWeight
         && clockSize == m_clockFontSize && dateSize == m_dateFontSize
-        && qFuzzyCompare(posX, m_clockPositionX) && qFuzzyCompare(posY, m_clockPositionY))
+        && qFuzzyCompare(posX, m_clockPositionX) && qFuzzyCompare(posY, m_clockPositionY)
+        && wakeFill == m_wakeFillPassword)
         return;
 
     m_clockWeight = clock;
@@ -99,6 +107,7 @@ void AppearanceConfig::reload()
     m_dateFontSize = dateSize;
     m_clockPositionX = posX;
     m_clockPositionY = posY;
+    m_wakeFillPassword = wakeFill;
     emit changed();
 }
 
@@ -115,7 +124,7 @@ void AppearanceConfig::onValueChanged(const QString &key)
 {
     static const QSet<QString> watched{
         kClockWeightKey, kDateWeightKey, kClockSizeKey, kDateSizeKey,
-        kPositionXKey, kPositionYKey,
+        kPositionXKey, kPositionYKey, kWakeFillKey,
     };
     if (watched.contains(key))
         reload();

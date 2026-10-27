@@ -381,6 +381,15 @@ void ScreenManager::activateAuthForScreen(const QString &screenName)
     setAuthScreen(screenByName(screenName));
 }
 
+void ScreenManager::setWakeFillPassword(bool fill)
+{
+    m_fillWakeText = fill;
+    // Off means off right away: a character already waiting for a field that is
+    // about to appear (the setting was just switched) must not arrive after it.
+    if (!fill)
+        m_pendingText.clear();
+}
+
 void ScreenManager::activateAuthForPointerScreen(const QString &initialText)
 {
     QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
@@ -457,7 +466,8 @@ bool ScreenManager::eventFilter(QObject *watched, QEvent *event)
     if (!target || target == m_authScreen)
         return QObject::eventFilter(watched, event);
 
-    m_pendingText = printableText(static_cast<QKeyEvent *>(event));
+    if (m_fillWakeText)
+        m_pendingText = printableText(static_cast<QKeyEvent *>(event));
     setAuthScreen(target);
     return true; // consumed: not for the previous screen's field
 }

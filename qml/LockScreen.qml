@@ -422,6 +422,10 @@ Window {
     // which knows where the pointer is; while this screen owns the field its
     // own key events are simply let through to the password input.
 
+    // `initialText` is the printable key that woke the lock (empty for a click
+    // or swipe). Whether it lands in the field is the `wakeFillPassword` setting;
+    // the screen hand-over below carries it along through ScreenManager and
+    // AuthView decides there.
     function wake(initialText) {
         if (root.unlocking)
             return

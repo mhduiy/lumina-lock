@@ -266,11 +266,32 @@ DccObject {
         }
     }
 
+    DccTitleObject {
+        name: "authTitle"
+        parentName: "luminalock"
+        displayName: qsTr("密码框")
+        weight: 70
+    }
+
+    DccObject {
+        name: "wakeFillPassword"
+        parentName: "luminalock"
+        displayName: qsTr("唤醒按键填入密码框")
+        description: qsTr("锁屏时按 1 等任意字符会切换到密码界面；开启时该字符直接作为密码的第一个字符，关闭时密码框保持为空，需手动输入完整密码")
+        weight: 72
+        backgroundType: DccObject.Normal
+        pageType: DccObject.Editor
+        page: D.Switch {
+            checked: dccData.wakeFillPassword
+            onCheckedChanged: dccData.setWakeFillPassword(checked)
+        }
+    }
+
     DccObject {
         name: "reset"
         parentName: "luminalock"
         displayName: qsTr("恢复默认")
-        description: qsTr("清空壁纸设置（含随机视频列表）并回到默认字号、字重与时间日期位置")
+        description: qsTr("清空壁纸设置（含随机视频列表）并回到默认字号、字重、时间日期位置与密码框行为")
         weight: 80
         backgroundType: DccObject.Normal
         pageType: DccObject.Editor
