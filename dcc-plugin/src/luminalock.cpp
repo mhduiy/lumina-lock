@@ -30,6 +30,10 @@ Luminalock::Luminalock(QObject *parent)
     : QObject(parent)
     , m_config(Dtk::Core::DConfig::create(kAppId, kAppId, QString(), this))
 {
+    if (m_config) {
+        connect(m_config, &Dtk::Core::DConfig::valueChanged,
+                this, &Luminalock::reload);
+    }
     reload();
 }
 
@@ -241,7 +245,10 @@ void Luminalock::setDateFontSize(int size)
 
 void Luminalock::setWakeFillPassword(bool fill)
 {
+    setLastError(QString());
     setConfigValue(kWakeFillKey, fill);
+    if (m_lastError.isEmpty() && (!configKeyAvailable(kWakeFillKey) || m_wakeFillPassword != fill))
+        setLastError(tr("无法保存唤醒按键填入密码框设置。"));
 }
 
 void Luminalock::resetToDefault()

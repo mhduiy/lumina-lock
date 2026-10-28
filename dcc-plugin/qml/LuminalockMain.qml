@@ -283,7 +283,10 @@ DccObject {
         pageType: DccObject.Editor
         page: D.Switch {
             checked: dccData.wakeFillPassword
-            onCheckedChanged: dccData.setWakeFillPassword(checked)
+            onToggled: {
+                dccData.setWakeFillPassword(checked)
+                root.selectionError = dccData.lastError
+            }
         }
     }
 

@@ -149,6 +149,13 @@ int main(int argc, char *argv[])
     ScreenManager screens;
     QQmlEngine engine;
     screens.setEngine(&engine);
+    // The wake-key character is decided where the key first arrives (here) and
+    // where it is finally typed (AuthView); both follow the same setting.
+    screens.setWakeFillPassword(appearanceConfig.wakeFillPassword());
+    QObject::connect(&appearanceConfig, &AppearanceConfig::changed, &screens,
+                     [&appearanceConfig, &screens] {
+                         screens.setWakeFillPassword(appearanceConfig.wakeFillPassword());
+                     });
 
     // The power menu: behaviour here, surface in qml/PowerScreen.qml, both
     // reached from QML through the `Power` singleton.

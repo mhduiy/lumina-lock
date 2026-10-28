@@ -406,7 +406,7 @@ void ScreenManager::activateAuthForPointerScreen(const QString &initialText)
 
 QString ScreenManager::takePendingText()
 {
-    const QString text = m_pendingText;
+    const QString text = m_fillWakeText ? m_pendingText : QString();
     m_pendingText.clear();
     return text;
 }
